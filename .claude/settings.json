@@ -12,6 +12,31 @@
         ],
         "matcher": "startup|resume|clear|compact"
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "bash -c 'ARGS=\"$CLAUDE_TOOL_INPUT\"; CMD=$(echo \"$ARGS\" | grep -oP '\"command\"\\s*:\\s*\"\\K[^\"]+' 2>/dev/null); if echo \"$CMD\" | grep -qiE \"git (commit|push)\"; then echo \"Scanning for secrets...\"; FOUND=$(grep -rn --include=\"*.py\" --include=\"*.yaml\" --include=\"*.yml\" --include=\"*.json\" -E \"(AIzaSy|sk-[a-zA-Z0-9]{20,}|sk-ant-|ATATT3x|AKIA[0-9A-Z]{16}|ghp_[0-9a-zA-Z]{36}|hf_[0-9a-zA-Z]{30})\" --exclude-dir=.git --exclude-dir=__pycache__ --exclude-dir=.venv --exclude-dir=node_modules --exclude=\".env*\" . 2>/dev/null); if [ -n \"$FOUND\" ]; then echo \"BLOCKED: Potential secrets detected in tracked files:\"; echo \"$FOUND\"; exit 2; fi; echo \"No secrets found.\"; fi'",
+            "statusMessage": "Secret scan...",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.ai-workspace/scripts/skill-suggest.sh\"",
+            "statusMessage": "Checking skills...",
+            "timeout": 5,
+            "type": "command",
+            "async": true
+          }
+        ],
+        "matcher": "Edit|Write|Read|Bash"
+      }
     ]
   }
 }
