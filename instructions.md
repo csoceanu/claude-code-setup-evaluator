@@ -40,60 +40,19 @@ This workspace has four types of capabilities:
 
 Skills activate on their own — you just get better results.
 
-### python-patterns
-**What:** Team conventions for credential management with dotenv — `.env` file structure, loading patterns, secure defaults.
-**When:** Writing code that uses environment variables or API keys.
-**Example:** You write `os.getenv("API_KEY", "AIza...")` — the AI flags the real key in the default value and fixes it to `os.getenv("API_KEY")` with a validation check.
-
-### python-testing
-**What:** TDD workflow (red/green/refactor) + pytest patterns + data science testing (DataFrames, models, validation).
-**When:** Writing tests, adding features with TDD, improving coverage.
-**Example:** You say "add a validation function" — the AI writes a failing test first with `pd.testing.assert_frame_equal` and parametrized edge cases, then implements the function to make it pass.
-
-### security-check
-**What:** Scans for credential leaks (10+ API key patterns: Gemini, OpenAI, Jira, AWS, GitHub), insecure code (eval, pickle, shell injection), and LLM-specific risks (PII sent to external APIs, executing LLM output).
-**When:** Before commits, when touching `.env` or config files, when sending data to LLMs.
-**Example:** You send raw email addresses to Gemini in a prompt — the AI flags PII leakage and suggests sanitizing before sending.
-
-### data-pipeline-patterns
-**What:** Pipeline stage design, data validation at boundaries, circuit breakers, checkpoint/resume, and a systematic debugging workflow for pipeline failures.
-**When:** Building or debugging data pipeline stages, validating JSON data files.
-**Example:** You add a new pipeline step — the AI structures it with input validation, metadata in output, checkpoint every 100 items, and a circuit breaker after 5 consecutive API failures.
-
-### api-client-patterns
-**What:** Retry with exponential backoff, rate limiting, response validation, authentication patterns, pagination, and LLM response parsing (stripping markdown fences, handling JSON from Gemini).
-**When:** Writing code that calls external APIs (Jira, Gemini, LDAP).
-**Example:** You build a Jira API client — the AI adds `timeout=30`, retry for 429/500/502/503 with `Retry-After` header support, and validates the response structure before accessing fields.
-
-### git-workflow
-**What:** Team-specific git conventions — GitLab and GitHub workflows, submodule push-before-parent pattern, common submodule pitfalls.
-**When:** Committing, pushing, resolving merge conflicts, working with submodules.
-**Example:** You push changes in a submodule — the AI pushes the submodule first, then updates the parent reference, following the correct order.
-
-### mcp-patterns
-**What:** Building and securing MCP servers — schema-first tool design, authentication, input validation, audit logging, and data science MCP patterns (dataset queries, model serving).
-**When:** Building MCP servers, configuring `.mcp.json`, reviewing MCP security.
-**Example:** You build an MCP tool for querying datasets — the AI enforces Pydantic input schemas with limits (`max_rows=10000`), adds audit logging, and uses principal-based auth.
-
-### verification-loop
-**What:** The unified verification engine. Covers environment checks, type checking, linting, tests, code review (with DS anti-patterns like data leakage and missing seeds), and security scans. The `/verify`, `/review`, and `/quality-gate` commands all invoke different phases of this one skill.
-**When:** After implementing a feature, before creating an MR, after refactoring.
-**Example:** You say "review my changes" — the AI runs Phase 5 (code review), checks for bare `except` clauses, functions over 50 lines, data leakage, and gives a verdict: APPROVE or REQUEST CHANGES.
-
-### deep-research
-**What:** Systematic multi-source research — breaks questions into sub-queries, searches in parallel, synthesizes findings with citations.
-**When:** Evaluating technologies, investigating APIs, answering complex technical questions.
-**Example:** You ask "what's the best Python library for HTML-to-PDF?" — the AI researches weasyprint, pdfkit, playwright, compares tradeoffs, and recommends one with reasoning.
-
-### codebase-onboarding
-**What:** Analyzes unfamiliar codebases through 4 phases — reconnaissance, architecture mapping, convention detection, guide generation.
-**When:** First time working in a new repo, onboarding a team member.
-**Example:** You open a repo you've never seen — the AI maps the directory structure, identifies entry points, detects testing conventions, and produces a "start here" guide.
-
-### compound-engineering
-**What:** Captures reusable patterns from sessions — errors that took multiple attempts to fix, user corrections, workarounds — and saves them as persistent memories for future sessions.
-**When:** End of significant sessions, when the AI notices something worth remembering, or when you say "remember this" or `/learn`.
-**Example:** You spend 20 minutes debugging a `.gitignore` negation issue — the AI saves "use `dir/*` not `dir/` for negation to work" so it never makes that mistake again. Next session, it already knows.
+| Name | Purpose | Example |
+|---|---|---|
+| python-patterns | Team dotenv conventions — `.env` structure, loading patterns, secure defaults | You write `os.getenv("API_KEY", "AIza...")` — the AI flags the real key in the default and fixes it to `os.getenv("API_KEY")` with a validation check |
+| python-testing | TDD workflow (red/green/refactor), pytest patterns, data science testing (DataFrames, models) | You say "add a validation function" — the AI writes a failing test first with `pd.testing.assert_frame_equal`, then implements to make it pass |
+| security-check | Credential leak detection (Gemini, OpenAI, Jira, AWS, GitHub keys), insecure code (eval, pickle, shell injection), LLM-specific risks | You send raw email addresses to Gemini — the AI flags PII leakage and suggests sanitizing before sending |
+| data-pipeline-patterns | Pipeline stage design, data validation at boundaries, circuit breakers, checkpoint/resume, debugging workflow | You add a new pipeline step — the AI structures it with input validation, checkpoints every 100 items, and a circuit breaker after 5 consecutive API failures |
+| api-client-patterns | Retry with exponential backoff, rate limiting, auth, pagination, LLM response parsing | You build a Jira API client — the AI adds `timeout=30`, retry for 429/500/502/503 with `Retry-After` support, and validates the response structure |
+| git-workflow | GitLab/GitHub conventions, submodule push-before-parent pattern, common pitfalls | You push changes in a submodule — the AI pushes the submodule first, then updates the parent reference, following the correct order |
+| mcp-patterns | Building/securing MCP servers — schema-first design, auth, input validation, audit logging, DS-specific patterns | You build an MCP tool for querying datasets — the AI enforces Pydantic input schemas with limits (`max_rows=10000`) and adds audit logging |
+| verification-loop | Unified verification engine behind `/verify`, `/review`, `/quality-gate` — environment checks, types, lint, tests, code review, security scans | You say "review my changes" — the AI checks for bare `except` clauses, functions over 50 lines, data leakage, and gives APPROVE or REQUEST CHANGES |
+| deep-research | Multi-source research — breaks questions into sub-queries, searches in parallel, synthesizes with citations | You ask "best Python library for HTML-to-PDF?" — the AI researches weasyprint, pdfkit, playwright, compares tradeoffs, and recommends one |
+| codebase-onboarding | 4-phase analysis of unfamiliar codebases — reconnaissance, architecture mapping, convention detection, guide generation | You open a repo you've never seen — the AI maps the structure, identifies entry points, detects testing conventions, and produces a "start here" guide |
+| compound-engineering | Captures reusable patterns from sessions — errors, corrections, workarounds — as persistent memories for future sessions | You spend 20 min debugging `.gitignore` negation — the AI saves "use `dir/*` not `dir/` for negation to work" so it knows next session |
 
 ---
 
@@ -101,35 +60,18 @@ Skills activate on their own — you just get better results.
 
 Type the command name in the chat to run it.
 
-### /plan
-Plan before you code. Restates requirements, searches the codebase for existing solutions (adopt/extend/build), identifies risks, and creates a step-by-step plan. **Waits for your OK before writing any code.**
-
-### /verify
-Does my code work? Runs `verification-loop` phases 1-4 (environment, types, lint, tests). Use **after coding, before review.**
-
-### /review
-Is my code good? Runs `verification-loop` phase 5 (code review with DS anti-patterns, security, quality). Produces APPROVE or REQUEST CHANGES. Use **after verify.**
-
-### /quality-gate
-Am I safe to push? Runs `verification-loop` phases 1-4 + phase 6 (tests + secret scan + pre-commit). Gives READY TO PUSH or BLOCKED. Use **after review, right before `git push`.**
-
-### /test-coverage
-Find untested code. Analyzes coverage, lists files without tests, identifies functions needing tests, and prioritizes what to test first (HIGH: core logic, MEDIUM: utilities, LOW: wrappers).
-
-### /toolkit
-What can I do here? Shows all available skills, commands, and agents, then recommends which to use based on your current repo and task. **Start here if you're new.**
-
-### /recap
-Summarize the session. Generates a structured update with what changed, why, key decisions, and a copy-pasteable message for standup or Slack.
-
-### /diff-explain
-Explain changes in plain language. Groups changes by intent — "the pipeline was split into 3 independent steps" instead of "14 files changed." Use for MR reviews or catching up.
-
-### /visualize
-Generate a visual project map. Creates an interactive HTML file with a collapsible file tree, color-coded by language, with file sizes and a breakdown chart.
-
-### /ai-engineer-review
-Get a brutally honest review from a principal AI engineer. Assesses architecture, code quality, skills/commands/hooks setup, finds redundancy and gaps, scores readability/maintainability/security, and gives the top 3 prioritized improvements with concrete instructions. Can focus on a specific area (`/ai-engineer-review security`) or a specific repo (`/ai-engineer-review repositories/ai-initiatives-observer`).
+| Name | Purpose | Example |
+|---|---|---|
+| /plan | Restate requirements, search for existing solutions, identify risks, create a step-by-step plan. Waits for your OK before writing code | "I need to add retry logic to the pipeline" — the AI searches for existing retry patterns, proposes a plan, and waits for approval |
+| /verify | Run verification phases 1–4: environment, types, lint, tests. Use after coding, before review | After writing a new module — run `/verify` to catch type errors and failing tests before review |
+| /review | Run phase 5: code review with DS anti-patterns and security checks. Produces APPROVE or REQUEST CHANGES. Use after `/verify` | The AI checks for bare `except` clauses, data leakage, functions over 50 lines, and gives a verdict |
+| /quality-gate | Run phases 1–4 + 6: tests + secret scan + pre-commit. Gives READY TO PUSH or BLOCKED. Use right before `git push` | Before pushing — run `/quality-gate` to confirm no secrets leaked and all tests pass |
+| /test-coverage | Analyze coverage, list untested files, prioritize what to test next (HIGH/MEDIUM/LOW) | The AI finds 3 core functions with no tests and marks them HIGH priority |
+| /toolkit | Show all available skills, commands, and agents, recommend based on current context. Start here if you're new | Type `/toolkit` in a new repo — get a tailored list of what's available and what to use first |
+| /recap | Summarize the session — what changed, why, key decisions. Copy-pasteable for standup or Slack | After a long session — get a structured update ready to paste into your team channel |
+| /diff-explain | Explain changes grouped by intent, not file count | "The pipeline was split into 3 independent steps" instead of "14 files changed" |
+| /visualize | Generate an interactive HTML project map with collapsible file tree, color-coded by language | Get a visual overview of the repo structure with file sizes and language breakdown |
+| /ai-engineer-review | Brutally honest architecture/code/security review with scored assessment and top 3 prioritized improvements | `/ai-engineer-review security` — focused security audit with concrete fix instructions |
 
 ---
 
@@ -137,9 +79,11 @@ Get a brutally honest review from a principal AI engineer. Assesses architecture
 
 The AI spawns these as sub-processes for parallel or specialized work.
 
-- **Explore** — fast codebase search across many files in parallel
-- **Plan** — designs implementation strategies for complex changes
-- **general-purpose** — handles multi-step research or complex tasks autonomously
+| Name | Purpose | Example |
+|---|---|---|
+| Explore | Fast codebase search across many files in parallel | The AI needs to find all API endpoints — it spawns Explore to search the entire repo in seconds |
+| Plan | Design implementation strategies for complex changes | You ask for a major refactor — the AI spawns Plan to map dependencies and propose an approach |
+| general-purpose | Handle multi-step research or complex tasks autonomously | The AI needs to research a library, read its docs, and test compatibility — it spawns a general-purpose agent |
 
 ---
 
@@ -147,9 +91,11 @@ The AI spawns these as sub-processes for parallel or specialized work.
 
 These run in the background on specific events.
 
-- **Session start** — reports git status of all submodules when you start a session
-- **Pre-commit secret scan** — blocks `git commit`/`git push` if API keys are detected in tracked files
-- **Auto-skill suggestion** — detects what files you're working with and reminds the AI which skills are relevant
+| Name | Purpose | Example |
+|---|---|---|
+| Session start | Reports git status of all submodules when you start a session | You open Claude Code — immediately see which repos have uncommitted changes or are behind remote |
+| Pre-commit secret scan | Blocks `git commit`/`git push` if API keys are detected in tracked files | You accidentally stage a file with an API key — the hook blocks the commit and tells you which file |
+| Auto-skill suggestion | Detects what files you're working with and reminds the AI which skills are relevant | You open a pipeline file — the AI is reminded to use `data-pipeline-patterns` and `security-check` |
 
 ---
 
