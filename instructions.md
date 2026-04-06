@@ -77,6 +77,8 @@ Type the command name in the chat to run it.
 | /visualize | Generate an interactive HTML project map with collapsible file tree, color-coded by language | Get a visual overview of the repo structure with file sizes and language breakdown |
 | /ai-engineer-review | Brutally honest architecture/code/security review with scored assessment and top 3 prioritized improvements | `/ai-engineer-review security` — focused security audit with concrete fix instructions |
 | /commit | Generate a short, accurate commit message from the diff + conversation context, show preview, commit after approval | You've been adding retry logic — type `/commit` and get `Add exponential backoff to Jira API client` instead of `update jira_client.py` |
+| /explain-code | Explain code from high-level overview to line-by-line analysis, scaled to complexity | `/explain-code src/pipeline/jira_client.py` — get purpose, structure breakdown, data flow, and gotchas for onboarding or knowledge transfer |
+| /architecture-docs | Generate architecture documentation with Mermaid diagrams — system overview, data flow, components, design decisions | `/architecture-docs repositories/ai-initiatives-observer` — produces a maintainable architecture doc with data flow diagrams and ADRs |
 
 ---
 
