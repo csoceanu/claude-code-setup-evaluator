@@ -1,0 +1,114 @@
+---
+description: Use when creating new AI agent skills, editing existing skills, or verifying skills work before deployment. TDD applied to process documentation.
+globs:
+alwaysApply: false
+---
+
+# Writing Skills
+
+## Overview
+
+**Writing skills IS Test-Driven Development applied to process documentation.**
+
+You write test cases (pressure scenarios), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
+
+**Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
+
+## When to Create a Skill
+
+**Create when:**
+- Technique wasn't intuitively obvious
+- You'd reference this again across projects
+- Pattern applies broadly (not project-specific)
+- Others would benefit
+
+**Don't create for:**
+- One-off solutions
+- Standard practices well-documented elsewhere
+- Project-specific conventions (put in project instructions)
+
+## Skill Types
+
+- **Technique** — Concrete method with steps (condition-based-waiting, root-cause-tracing)
+- **Pattern** — Way of thinking about problems (flatten-with-flags, test-invariants)
+- **Reference** — API docs, syntax guides, tool documentation
+
+## SKILL.md Structure
+
+```markdown
+---
+name: Skill-Name-With-Hyphens
+description: Use when [specific triggering conditions and symptoms]
+---
+
+# Skill Name
+
+## Overview
+What is this? Core principle in 1-2 sentences.
+
+## When to Use
+Bullet list with SYMPTOMS and use cases
+
+## Core Pattern
+Before/after code comparison
+
+## Quick Reference
+Table or bullets for scanning
+
+## Common Mistakes
+What goes wrong + fixes
+```
+
+## The Iron Law
+
+```
+NO SKILL WITHOUT A FAILING TEST FIRST
+```
+
+This applies to NEW skills AND EDITS to existing skills.
+
+## RED-GREEN-REFACTOR for Skills
+
+### RED: Write Failing Test (Baseline)
+Run pressure scenario WITHOUT the skill. Document exact behavior:
+- What choices did they make?
+- What rationalizations did they use?
+
+### GREEN: Write Minimal Skill
+Write skill that addresses those specific failures. Run same scenarios WITH skill — agent should now comply.
+
+### REFACTOR: Close Loopholes
+Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
+
+## Description Best Practices
+
+- Start with "Use when..." to focus on triggering conditions
+- Include specific symptoms, situations, and contexts
+- **NEVER summarize the skill's process or workflow in the description**
+- Write in third person
+- Keep under 500 characters
+
+```yaml
+# BAD: Summarizes workflow
+description: Use when executing plans - dispatches per task with code review
+
+# GOOD: Just triggering conditions
+description: Use when executing implementation plans with independent tasks
+```
+
+## File Organization
+
+```
+skills/
+  skill-name/
+    SKILL.md              # Main reference (required)
+    supporting-file.*     # Only if needed
+```
+
+## Anti-Patterns
+
+- Narrative storytelling instead of reusable patterns
+- Multi-language dilution (one excellent example beats many mediocre ones)
+- Code in flowcharts (can't copy-paste)
+- Generic labels without semantic meaning
+- Creating multiple skills in batch without testing each

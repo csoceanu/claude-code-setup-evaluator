@@ -1,6 +1,6 @@
 # Getting Started with the AI Workspace
 
-Welcome! This workspace gives you superpowers when working with Claude Code. Here's how to get started and what's available to you.
+Welcome! This workspace gives you superpowers when working with AI coding assistants. It supports both **Claude Code** and **Cursor** — same skills, same commands, same workflow.
 
 ---
 
@@ -14,10 +14,12 @@ Welcome! This workspace gives you superpowers when working with Claude Code. Her
    git submodule add <your-repo-url> repositories/<repo-name>
    ```
 
-2. **Start Claude Code** in the workspace root:
-   ```bash
-   claude
-   ```
+2. **Start your AI tool** in the workspace root:
+
+   | Tool | How to start |
+   |---|---|
+   | Claude Code | Run `claude` in the terminal |
+   | Cursor | Open the workspace folder in Cursor |
 
 3. **Type `/toolkit`** to see what's available and get recommendations based on your current repo.
 
@@ -29,16 +31,26 @@ That's it. Everything else activates automatically as you work.
 
 This workspace has four types of capabilities:
 
-- **Skills** — knowledge the AI carries. Activate automatically when relevant. You don't do anything.
-- **Commands** — buttons you press. Type `/command` to trigger a specific workflow.
-- **Agents** — helpers the AI sends to do work in parallel. You don't control them.
-- **Hooks** — tripwires that fire on events (like blocking a push if secrets are detected).
+| Capability | What it is | Claude Code | Cursor |
+|---|---|---|---|
+| **Skills** | Knowledge the AI carries. Activates automatically when relevant. | `skills/*/SKILL.md` | `.cursor/rules/*.mdc` |
+| **Commands** | Workflows you trigger by typing `/command` in chat. | `.claude/commands/` | `.cursor/commands/` |
+| **Agents** | Helpers the AI spawns for parallel work. You don't control them. | Built-in (Explore, Plan, general-purpose) | Built-in (background agents) |
+| **Hooks** | Tripwires that fire on events (like blocking a push if secrets are detected). | Full support (session start, pre-commit, skill suggestion) | Session start only |
+
+### Hooks: What's different between tools
+
+| Hook | Claude Code | Cursor |
+|---|---|---|
+| Session start (repo status) | Yes | Yes |
+| Pre-commit secret scan | Yes (blocks git commit/push if API keys detected) | No — run `/quality-gate` manually before pushing |
+| Auto-skill suggestion | Yes (reminds AI which skills are relevant) | Partial — rules with `globs` auto-attach when matching files are open |
 
 ---
 
 ## Skills (automatic)
 
-Skills activate on their own — you just get better results.
+Skills activate on their own — you just get better results. In Claude Code they live in `skills/`, in Cursor they live in `.cursor/rules/`. Same content, different format.
 
 | Name | Purpose | Example |
 |---|---|---|
@@ -62,7 +74,7 @@ Skills activate on their own — you just get better results.
 
 ## Commands (you trigger these)
 
-Type the command name in the chat to run it.
+Type the command name in the chat to run it. Commands work the same in both Claude Code and Cursor.
 
 | Name | Purpose | Example |
 |---|---|---|
@@ -86,27 +98,17 @@ Type the command name in the chat to run it.
 
 The AI spawns these as sub-processes for parallel or specialized work.
 
-| Name | Purpose | Example |
-|---|---|---|
-| Explore | Fast codebase search across many files in parallel | The AI needs to find all API endpoints — it spawns Explore to search the entire repo in seconds |
-| Plan | Design implementation strategies for complex changes | You ask for a major refactor — the AI spawns Plan to map dependencies and propose an approach |
-| general-purpose | Handle multi-step research or complex tasks autonomously | The AI needs to research a library, read its docs, and test compatibility — it spawns a general-purpose agent |
-
----
-
-## Hooks (automatic)
-
-These run in the background on specific events.
-
-| Name | Purpose | Example |
-|---|---|---|
-| Session start | Reports git status of all submodules when you start a session | You open Claude Code — immediately see which repos have uncommitted changes or are behind remote |
-| Pre-commit secret scan | Blocks `git commit`/`git push` if API keys are detected in tracked files | You accidentally stage a file with an API key — the hook blocks the commit and tells you which file |
-| Auto-skill suggestion | Detects what files you're working with and reminds the AI which skills are relevant | You open a pipeline file — the AI is reminded to use `data-pipeline-patterns` and `security-check` |
+| Name | Purpose | Claude Code | Cursor |
+|---|---|---|---|
+| Explore | Fast codebase search across many files in parallel | Yes — dedicated Explore agent | Yes — background agent |
+| Plan | Design implementation strategies for complex changes | Yes — dedicated Plan agent | Yes — background agent |
+| general-purpose | Handle multi-step research or complex tasks autonomously | Yes — dedicated agent type | Yes — background agent |
 
 ---
 
 ## Recommended Workflow
+
+This workflow is the same regardless of which tool you use:
 
 ```
 /plan          →  align on approach, search for existing solutions
@@ -119,7 +121,25 @@ These run in the background on specific events.
                   ↓
 /quality-gate  →  am I safe to push? (tests + secrets + lint)
                   ↓
-git push       →  secret scan hook runs automatically
+git push       →  secret scan hook runs automatically (Claude Code)
+                  /quality-gate covers this for Cursor users
                   ↓
 /recap         →  summarize for standup or stakeholders
 ```
+
+---
+
+## Tool-Specific Notes
+
+### Claude Code
+
+- All hooks are active (session start, secret scan, skill suggestion)
+- Skills live in `skills/*/SKILL.md` and are loaded by the agent when relevant
+- Run `claude` in the workspace root to start
+
+### Cursor
+
+- Session start hook is active (reports repo status)
+- Skills live in `.cursor/rules/*.mdc` — some auto-attach based on file type (Python files, test files, config files), others are picked by the agent based on the description
+- No pre-commit secret scan hook — **always run `/quality-gate` before pushing**
+- Open the workspace folder in Cursor to start
