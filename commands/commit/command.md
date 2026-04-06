@@ -53,20 +53,26 @@ Use conversation context to get this right. If the user spent the session debugg
 
 ### Step 4: Generate Message
 
-**Subject line:**
+**Subject line only. No body. One short sentence.**
 - Imperative mood ("Add retry logic" not "Added retry logic")
 - Under 72 characters
 - Starts with the category verb from Step 3
 - Specific — name the thing that changed
 
-**Body (when changes are non-trivial):**
-- Explain **why** the change was made — the motivation, the problem it solves
-- Use conversation context — you know why because you were part of the session
-- Skip the body for trivial changes (typo fixes, single-line config changes)
+**Examples of good messages:**
+- `Add exponential backoff to Jira API client`
+- `Fix silent failure on 429 responses`
+- `Remove unused config loader`
+- `Update pipeline to checkpoint every 100 items`
+
+**Examples of bad messages:**
+- `Update files` (too vague)
+- `Add exponential backoff to Jira API client to handle transient errors that were causing silent failures in the pipeline` (too long — save it for the PR)
+- `Added retry logic` (past tense)
 
 **Ticket reference:**
 - Extract ticket ID from branch name if present (e.g., `DATA-456-add-retry` -> `DATA-456`)
-- Append to subject or body if found
+- Prepend to message: `DATA-456: Add exponential backoff to Jira API client`
 
 ### Step 5: Present for Approval
 
