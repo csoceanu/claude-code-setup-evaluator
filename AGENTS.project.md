@@ -5,6 +5,7 @@ Data Science team at Red Hat. This workspace is a pilot for standardizing how we
 ## Repositories
 
 - `repositories/ai-initiatives-observer/` — Pipeline that discovers AI-related work across the org by analyzing Jira tickets. Python, Gemini API.
+- `repositories/site-analysis/` — People & expertise discovery pipeline for geographic sites. Analyzes Jira activity to generate per-person work profiles. Python, Gemini API.
 
 ## Conventions (all repos)
 
@@ -24,7 +25,7 @@ Skills activate automatically. See `instructions.md` for full details.
 - `api-client-patterns` — Retry logic, rate limiting, API integration
 - `python-testing` — TDD workflow + data science testing patterns
 - `python-patterns` — Team dotenv conventions
-- `git-workflow` — GitLab/GitHub, submodule workflow
+- `git-workflow` — GitLab/GitHub conventions, branch workflow
 - `mcp-patterns` — Building and securing MCP servers
 - `deep-research` — Multi-source research and analysis
 - `codebase-onboarding` — Systematic onboarding to unfamiliar codebases
