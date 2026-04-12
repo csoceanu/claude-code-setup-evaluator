@@ -173,6 +173,7 @@ Data Science team at Red Hat. This workspace is a pilot for standardizing how we
 - **Secrets**: Never commit `.env` files, API keys, or tokens. Use environment variables.
 - **Branches**: Work on feature branches, not main. Open MRs for code review.
 - **Issue tracking**: Jira
+- **Never push unless told**: Do not run `git push` unless the user explicitly asks. After committing, stop and report what was committed.
 
 ## Available Skills
 
