@@ -7,7 +7,7 @@ A shared workspace for using AI coding assistants (Claude Code, Cursor) consiste
 AI assistants work great in a single repo, but our team works across multiple projects with shared conventions. Without a shared setup, everyone reinvents the wheel — writing their own prompts, missing best practices, and getting inconsistent results. This workspace solves that by giving every team member:
 
 - **Shared skills** — team knowledge baked into the AI (dotenv patterns, pipeline design, security checks, TDD workflows, and more)
-- **Shared commands** — `/verify`, `/review`, `/quality-gate`, `/plan`, `/recap` — the same workflows everywhere
+- **Shared commands** — `/verify`, `/review`, `/quality-gate`, `/plan`, `/refactor-safe`, `/recap` and more — the same workflows everywhere
 - **Cross-repo visibility** — all our repos in one workspace, so the AI can see and work across project boundaries
 - **Onboarding in minutes** — new team members (or new repos) get the full AI setup immediately
 
@@ -57,10 +57,14 @@ or just start asking about it:
 | `/review` | Before pushing | Code review with security and DS anti-pattern checks |
 | `/quality-gate` | Right before `git push` | Pre-push safety check (tests + secret scan) |
 | `/commit` | When ready to commit | Generates a good commit message, shows preview, you approve |
+| `/refactor-safe` | After review | Refactors internals without changing public API |
 | `/test-coverage` | When adding tests | Finds untested code and generates missing tests |
+| `/env-check` | First clone / something broke | Validates Python version, dependencies, env vars, config |
 | `/recap` | End of session | Summarizes what you did — copy-paste for standup |
 | `/diff-explain` | Reviewing changes | Explains a branch's changes by intent, not file count |
 | `/explain-code` | Onboarding / unfamiliar code | Explains code at the right level of detail |
+| `/explain-simple` | Non-technical audience | Explains a file or folder like you're 15 — no jargon |
+| `/prompt-test` | After editing LLM prompts | Tests prompts against sample inputs, checks quality, catches regressions |
 | `/ai-engineer-review` | Architecture check | Brutally honest architecture and code review |
 | `/architecture-docs` | Documentation | Generates architecture docs with diagrams |
 | `/toolkit` | First time / discovery | Shows everything available and recommends what to use |
@@ -127,7 +131,7 @@ Claude: ## What was done
 |---|---|
 | `repositories/` | Your repos — clone what you need here |
 | `skills/` | 15 AI skills — team patterns, security, testing, pipelines, and more |
-| `commands/` | 13 slash commands — `/plan`, `/verify`, `/review`, `/quality-gate`, etc. |
+| `commands/` | 17 slash commands — `/plan`, `/verify`, `/review`, `/quality-gate`, etc. |
 | `agent-docs/` | Modular documentation the AI reads based on task relevance |
 | `.cursor/rules/` | Same skills, formatted for Cursor |
 | `.cursor/commands/` | Same commands, formatted for Cursor |
