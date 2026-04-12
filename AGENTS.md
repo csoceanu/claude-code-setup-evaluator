@@ -39,10 +39,20 @@ For more information, see [`agent-docs/README.md`](agent-docs/README.md).
 ### Agent Docs
 
 <agent-docs-items>
+<doc path="agent-docs/subagent-driven-development.md">
+<name>Subagent-Driven Development Guide</name>
+<description>Execute implementation plans by dispatching a fresh subagent per task with two-stage review (spec compliance, then code quality). Power-user workflow for complex multi-task implementations.</description>
+<when-to-read>When executing implementation plans with many independent tasks in the current session. When you need isolated context per task to avoid pollution.</when-to-read>
+</doc>
 <doc path="agent-docs/workspace-development.md">
 <name>Workspace Development Guide</name>
 <description>How to modify, configure, and extend this workspace. Covers configuration, AGENTS.md generation, package management, creating agent-docs/skills/commands, tool discovery, and session hooks.</description>
 <when-to-read>When modifying workspace infrastructure or configuration. When creating or editing agent-docs, skills, or commands. When updating AGENTS.md, README.md, or AGENTS.project.md. When adding dependencies or changing ai-workspace.toml. When adding session hook support for a new AI tool.</when-to-read>
+</doc>
+<doc path="agent-docs/writing-skills.md">
+<name>Writing Skills Guide</name>
+<description>TDD methodology for creating new AI skills. Covers skill types, SKILL.md structure, Claude Search Optimization, testing with subagents, and the RED-GREEN-REFACTOR cycle applied to documentation.</description>
+<when-to-read>When creating new skills, editing existing skills, or verifying skills work before deployment. When extending the workspace with new team-specific patterns.</when-to-read>
 </doc>
 </agent-docs-items>
 
@@ -168,7 +178,7 @@ Data Science team at Red Hat. This workspace is a pilot for standardizing how we
 
 ## Conventions (all repos)
 
-- **Language**: Python 3.10+
+- **Language**: Python 3.11+ (workspace), Python 3.10+ minimum (repos)
 - **Testing**: pytest. Run tests before committing.
 - **Secrets**: Never commit `.env` files, API keys, or tokens. Use environment variables.
 - **Branches**: Work on feature branches, not main. Open MRs for code review.
@@ -189,9 +199,6 @@ Skills activate automatically. See `instructions.md` for full details.
 - `mcp-patterns` — Building and securing MCP servers
 - `deep-research` — Multi-source research and analysis
 - `codebase-onboarding` — Systematic onboarding to unfamiliar codebases
-- `compound-engineering` — Captures session patterns as persistent memories
 - `brainstorming` — Collaborative design exploration before implementation
 - `writing-plans` — Creates detailed implementation plans from approved specs
-- `subagent-driven-development` — Executes plans by dispatching a subagent per task with two-stage review
-- `writing-skills` — Creates new AI skills using TDD for documentation
 </project-context>
