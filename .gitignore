@@ -88,8 +88,10 @@ cython_debug/
 # Exception: .ai-workspace/lib/ contains project source code, not a Python packaging artifact.
 !.ai-workspace/lib/
 
-# Exception: repositories/ contains git submodules, not Python packaging artifacts.
-!repositories/**
+# repositories/ is a user workspace — each user clones repos they need.
+# Only keep the .gitkeep so the folder exists after cloning.
+repositories/*
+!repositories/.gitkeep
 
 # Zensical documentation build output
 /site
