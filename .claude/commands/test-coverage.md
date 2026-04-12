@@ -1,1 +1,1 @@
-/home/bkapner/AI-set-up/ai-workspace-template-ds/commands/test-coverage/command.md
+/home/bkapner/AI-workspace-ds/ai-workspace-template-ds/commands/test-coverage/command.md

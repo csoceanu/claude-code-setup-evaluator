@@ -1,1 +1,1 @@
-/home/bkapner/AI-set-up/ai-workspace-template-ds/commands/diff-explain/command.md
+/home/bkapner/AI-workspace-ds/ai-workspace-template-ds/commands/diff-explain/command.md
