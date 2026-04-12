@@ -130,9 +130,9 @@ Claude: ## What was done
 | Directory | What it is |
 |---|---|
 | `repositories/` | Your repos — clone what you need here |
-| `skills/` | 15 AI skills — team patterns, security, testing, pipelines, and more |
+| `skills/` | 12 AI skills — team patterns, security, testing, pipelines, and more |
 | `commands/` | 17 slash commands — `/plan`, `/verify`, `/review`, `/quality-gate`, etc. |
-| `agent-docs/` | Modular documentation the AI reads based on task relevance |
+| `agent-docs/` | On-demand documentation the AI reads when relevant (writing skills guide, subagent development, etc.) |
 | `.cursor/rules/` | Same skills, formatted for Cursor |
 | `.cursor/commands/` | Same commands, formatted for Cursor |
 
