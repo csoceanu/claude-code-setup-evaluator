@@ -9,7 +9,7 @@ Data Science team at Red Hat. This workspace is a pilot for standardizing how we
 
 ## Conventions (all repos)
 
-- **Language**: Python 3.10+
+- **Language**: Python 3.11+ (workspace), Python 3.10+ minimum (repos)
 - **Testing**: pytest. Run tests before committing.
 - **Secrets**: Never commit `.env` files, API keys, or tokens. Use environment variables.
 - **Branches**: Work on feature branches, not main. Open MRs for code review.
@@ -30,8 +30,5 @@ Skills activate automatically. See `instructions.md` for full details.
 - `mcp-patterns` — Building and securing MCP servers
 - `deep-research` — Multi-source research and analysis
 - `codebase-onboarding` — Systematic onboarding to unfamiliar codebases
-- `compound-engineering` — Captures session patterns as persistent memories
 - `brainstorming` — Collaborative design exploration before implementation
 - `writing-plans` — Creates detailed implementation plans from approved specs
-- `subagent-driven-development` — Executes plans by dispatching a subagent per task with two-stage review
-- `writing-skills` — Creates new AI skills using TDD for documentation
