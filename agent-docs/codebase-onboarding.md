@@ -3,7 +3,9 @@ title: "Codebase Onboarding"
 description: |
   Systematic onboarding to unfamiliar codebases. Analyzes project structure, tech stack, conventions, entry points, and data flow to produce an onboarding guide. Use when joining a new project or helping a team member get started.
 when: |
-  Systematic onboarding to unfamiliar codebases. Analyzes project structure, tech stack, conventions, entry points, and data flow to produce an onboarding guide. Use when joining a new project or helping a team member get started.
+  When exploring an unfamiliar repository for the first time. When generating
+  onboarding docs for a new team member. When analyzing project structure,
+  conventions, dependencies, or entry points of a codebase you haven't worked in before.
 ---
 
 ---

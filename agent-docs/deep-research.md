@@ -3,7 +3,9 @@ title: "Deep Research"
 description: |
   Multi-source deep research with citations. Use when the user wants thorough research on any topic — technology evaluation, library comparison, algorithm analysis, literature review, or competitive analysis. Searches the web, synthesizes findings, and delivers cited reports.
 when: |
-  Multi-source deep research with citations. Use when the user wants thorough research on any topic — technology evaluation, library comparison, algorithm analysis, literature review, or competitive analysis. Searches the web, synthesizes findings, and delivers cited reports.
+  When the user asks for research, comparison, or evaluation of technologies,
+  libraries, algorithms, or approaches. When producing a literature review,
+  competitive analysis, or trade-off assessment that requires multiple web sources.
 ---
 
 ---

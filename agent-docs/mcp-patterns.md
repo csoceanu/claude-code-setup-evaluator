@@ -3,7 +3,9 @@ title: "Mcp Patterns"
 description: |
   Patterns for building, securing, and consuming MCP (Model Context Protocol) servers. Covers schema-first design, authentication, input validation, audit logging, and security best practices.
 when: |
-  Patterns for building, securing, and consuming MCP (Model Context Protocol) servers. Covers schema-first design, authentication, input validation, audit logging, and security best practices.
+  When building, modifying, or debugging an MCP server. When defining MCP tool
+  schemas, configuring MCP authentication, or reviewing MCP security. When
+  a .mcp.json file is present and the user is working on MCP integration.
 ---
 
 ---
