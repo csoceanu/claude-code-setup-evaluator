@@ -66,9 +66,9 @@ or just start asking about it:
 | `/explain-simple` | Non-technical audience | Explains a file or folder like you're 15 — no jargon |
 | `/prompt-test` | After editing LLM prompts | Tests prompts against sample inputs, checks quality, catches regressions |
 | `/ai-engineer-review` | Architecture check | Brutally honest architecture and code review |
-| `/architecture-docs` | Documentation | Generates architecture docs with diagrams |
+| `/architecture-docs` | Documentation | Generates architecture docs with diagrams (`--quick` for just a Mermaid diagram) |
+| `/focus` | Switch repos mid-session | Re-presents the repo menu, replaces current focus |
 | `/toolkit` | First time / discovery | Shows everything available and recommends what to use |
-| `/visualize` | Exploring a project | Interactive HTML map of the project structure |
 
 **5. Push from inside the repo:**
 ```bash
@@ -80,7 +80,7 @@ Pushes go to the repo's own remote. The workspace is never involved.
 
 ## What You DON'T Need To Do
 
-- **Don't memorize skills.** There are 8 of them (security, pipelines, testing, etc.) — they activate automatically when relevant. You just get better results without thinking about it.
+- **Don't memorize skills.** There are 7 of them (security, pipelines, testing, etc.) — they activate automatically when relevant. You just get better results without thinking about it.
 - **Don't configure anything per-repo.** The workspace handles it.
 - **Don't worry about pushing to the wrong repo.** Your repos are independent clones. `git push` from inside a repo goes to that repo's remote.
 
@@ -92,7 +92,7 @@ $ claude
 
 You: I'm working on site-analysis. Add retry logic to the Jira fetcher.
 
-Claude: [reads the code, uses api-client-patterns skill automatically]
+Claude: [reads the code, uses python-conventions skill automatically]
         Let me plan this first...
         [proposes approach with exponential backoff]
 
