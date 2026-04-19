@@ -98,13 +98,13 @@ else
     fail "Skill suggest: pipeline file → data-pipeline-patterns" "Got: $OUTPUT"
 fi
 
-# Test 8: Git command → git-workflow
+# Test 8: Git command → security-check
 export CLAUDE_TOOL_INPUT='{"command": "git push origin main"}'
 OUTPUT=$(bash "$PROJECT_DIR/.ai-workspace/scripts/skill-suggest.sh" 2>&1)
-if echo "$OUTPUT" | grep -q "git-workflow"; then
-    pass "Skill suggest: git push → git-workflow"
+if echo "$OUTPUT" | grep -q "security-check"; then
+    pass "Skill suggest: git push → security-check"
 else
-    fail "Skill suggest: git push → git-workflow" "Got: $OUTPUT"
+    fail "Skill suggest: git push → security-check" "Got: $OUTPUT"
 fi
 
 # Test 9: No match → no output

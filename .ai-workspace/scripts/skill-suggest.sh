@@ -29,7 +29,7 @@ if echo "$FILE" | grep -qiE 'pipeline|fetch_|group_|filter_|summarize_|categoriz
 fi
 
 if echo "$FILE" | grep -qiE 'api|client|request|fetch'; then
-    SKILLS="$SKILLS api-client-patterns"
+    SKILLS="$SKILLS python-conventions"
 fi
 
 if echo "$FILE" | grep -qiE '\.mcp|mcp'; then
@@ -42,7 +42,7 @@ if echo "$CMD" | grep -qiE 'pytest|test|coverage'; then
 fi
 
 if echo "$CMD" | grep -qiE 'git (commit|push|merge|rebase)'; then
-    SKILLS="$SKILLS git-workflow"
+    SKILLS="$SKILLS security-check"
 fi
 
 # Deduplicate and output

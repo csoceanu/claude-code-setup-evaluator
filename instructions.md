@@ -85,11 +85,9 @@ Skills activate on their own — you just get better results. In Claude Code the
 
 | Name | Purpose | Example | How it works backstage |
 |---|---|---|---|
-| python-conventions | Team dotenv conventions, TDD workflow, pytest patterns | You write `os.getenv("API_KEY", "AIza...")` — the AI flags the real key in the default and fixes it | Loaded into context when you edit Python files. The skill-suggest hook detects Python work and attaches it. ~300 words. |
+| python-conventions | Team dotenv conventions, API client rules, LLM response parsing, TDD workflow, pytest patterns | You write `os.getenv("API_KEY", "AIza...")` — the AI flags the real key in the default and fixes it | Loaded into context when you edit Python files or API client code. ~480 words. |
 | security-check | Credential leak detection (Gemini, Jira, AWS keys), insecure code (eval, pickle, shell injection), LLM-specific risks | You send raw email addresses to Gemini — the AI flags PII leakage and suggests sanitizing | Loaded when you edit code that touches credentials, APIs, or security-sensitive patterns. Also runs as a git hook before commit/push. ~1,020 words. |
 | data-pipeline-patterns | Pipeline stage design, data validation, circuit breakers, checkpoint/resume, debugging | You add a new pipeline step — the AI structures it with validation, checkpoints, and a circuit breaker | Loaded when you work on pipeline scripts or data processing code. Teaches team-specific stage structure. ~908 words. |
-| api-client-patterns | Retry with exponential backoff, rate limiting, auth, pagination, LLM response parsing | You build a Jira API client — the AI adds timeout, retry for 429/500, and validates the response | Loaded when you write code that calls external APIs (Jira, Gemini, LDAP, etc.). ~787 words. |
-| git-workflow | GitLab/GitHub conventions, branch workflow, commit practices | You commit changes — the AI follows team conventions: feature branches, clear messages, MRs | Loaded when you do git operations. Very lightweight. ~279 words. |
 | verification-loop | Unified engine behind `/verify`, `/review`, `/quality-gate` — environment, types, lint, tests, review, security | You run `/review` — the AI checks for bare excepts, long functions, data leakage | Loaded only when you invoke /verify, /review, or /quality-gate. Powers all three commands. ~503 words. |
 | brainstorming | Design exploration before implementation — asks questions, proposes approaches, presents design for approval | You say "I want to add retry logic" — the AI asks about failure modes, proposes approaches, writes a spec | Loaded when creative/design work is detected. Hard gate prevents coding before design approval. ~332 words. |
 | writing-plans | Creates implementation plans from approved specs — bite-sized tasks, exact file paths, TDD steps | The AI produces: "Task 1: write failing test, Task 2: implement, Task 3: verify..." | Loaded after brainstorming completes or when you need a detailed plan. ~914 words. |
@@ -118,6 +116,7 @@ Type the command name in the chat to run it. Commands work the same in both Clau
 | /quality-gate | Pre-push safety check: tests + secret scan + pre-commit | Before pushing — confirms no secrets leaked, tests pass | Invokes verification-loop phases 1-4 + 6. Skips code review. |
 | /commit | Generate commit message from diff, show preview, commit after approval | Type `/commit` → get "Add exponential backoff to Jira API client" | Reads git diff, analyzes changes, drafts message. Never commits without your approval. |
 | /test-coverage | Analyze coverage, find untested code, generate missing tests | Finds 3 core functions with no tests, marks them HIGH priority | Runs pytest --cov, analyzes output, generates test files targeting gaps. |
+| /focus | Switch which repo(s) to focus on mid-session | `/focus` → pick repos from numbered list | Re-presents the repo selection menu. Completely replaces previous focus. |
 | /toolkit | Show all skills, commands, agents. Recommends based on current context | Type in a new repo — get tailored recommendations | Scans the repo type, recent changes, and project structure to suggest relevant tools. |
 | /recap | Summarize session — what changed, why, key decisions. Copy-pasteable | Get a structured standup update after a long session | Reads git log, diffs, and conversation history to generate summary. |
 | /diff-explain | Explain changes grouped by intent, not file count | "Pipeline was split into 3 steps" instead of "14 files changed" | Reads git diff, groups changes by purpose, explains the "why" not the "what". |
@@ -127,8 +126,7 @@ Type the command name in the chat to run it. Commands work the same in both Clau
 | /explain-simple | Explain a file or folder like you're 15 — no jargon | "This script downloads work tickets from Jira..." | Reads the target, rewrites explanation with analogies, no code, under 200 words. |
 | /explain-code | Explain code from high-level to line-by-line, scaled to complexity | Purpose, structure, data flow, gotchas for a pipeline file | Reads imports, call patterns, and usage to build layered explanation. |
 | /prompt-test | Test LLM prompts against sample inputs, catch regressions | Runs prompt with 3 inputs, flags hallucinations on sparse data | Calls the prompt function, optionally calls the LLM, evaluates output quality. |
-| /architecture-docs | Generate architecture docs with Mermaid diagrams | System overview, data flow, design decisions | Scans project structure, traces data flow, generates markdown with diagrams. |
-| /visualize | Mermaid flow diagram of project architecture | `flowchart LR` showing pipeline stages and data flow | Reads codebase, identifies main flow, outputs `.mmd` file. |
+| /architecture-docs | Generate architecture docs with Mermaid diagrams | System overview, data flow, design decisions | Full mode: scans project, generates comprehensive docs. `--quick`: just a Mermaid diagram. |
 
 ---
 

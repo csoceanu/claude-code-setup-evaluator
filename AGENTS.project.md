@@ -23,8 +23,6 @@ Skills activate automatically. See `instructions.md` for full details.
 - `verification-loop` — Unified verification engine (used by /verify, /review, /quality-gate)
 - `security-check` — Credential leaks, LLM security, insecure patterns
 - `data-pipeline-patterns` — Pipeline stage design, validation, debugging
-- `api-client-patterns` — Retry logic, rate limiting, API integration
-- `python-conventions` — Team dotenv conventions + TDD workflow + testing patterns
-- `git-workflow` — GitLab/GitHub conventions, branch workflow
+- `python-conventions` — Team dotenv conventions, API client rules, LLM response parsing, TDD workflow
 - `brainstorming` — Collaborative design exploration before implementation
 - `writing-plans` — Creates detailed implementation plans from approved specs
