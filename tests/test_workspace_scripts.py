@@ -4,6 +4,7 @@ Verifies that align-workspace, transpile-commands, and transpile-skills
 produce correct output and don't silently lose content.
 """
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,24 @@ def run_script(script_name: str) -> subprocess.CompletedProcess:
         text=True,
         cwd=str(ROOT),
     )
+
+
+def _import_script(name: str):
+    """Import a script from .ai-workspace/scripts/ by filename."""
+    lib_path = str(ROOT / ".ai-workspace" / "lib")
+    if lib_path not in sys.path:
+        sys.path.insert(0, lib_path)
+
+    script_path = ROOT / ".ai-workspace" / "scripts" / name
+    module_name = name.replace("-", "_").replace(".py", "")
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_skills_mod = _import_script("transpile-skills.py")
+_commands_mod = _import_script("transpile-commands.py")
 
 
 class TestAlignWorkspace:
@@ -124,3 +143,112 @@ class TestTranspileSkills:
 
         stale = cursor_names - source_names
         assert not stale, f"Stale Cursor rules for removed skills: {stale}"
+
+
+class TestSkillValidationErrors:
+    """Error-case tests for skill validation logic."""
+
+    def test_missing_frontmatter(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("# No frontmatter\nJust content.")
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("frontmatter" in e.lower() for e in errors)
+
+    def test_invalid_yaml_frontmatter(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("---\n: [invalid yaml\n---\n# Body")
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("frontmatter" in e.lower() for e in errors)
+
+    def test_missing_name_field(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            '---\ndescription: "A skill"\n---\n# Body\nContent here.'
+        )
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("name" in e.lower() for e in errors)
+
+    def test_missing_description_field(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: my-skill\n---\n# Body\nContent here."
+        )
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("description" in e.lower() for e in errors)
+
+    def test_invalid_name_format(self, tmp_path):
+        skill_dir = tmp_path / "My_Skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            '---\nname: My_Skill\ndescription: "A skill"\n---\n# Body\nContent.'
+        )
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("lowercase" in e.lower() or "alphanumeric" in e.lower() for e in errors)
+
+    def test_name_doesnt_match_directory(self, tmp_path):
+        skill_dir = tmp_path / "actual-name"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            '---\nname: wrong-name\ndescription: "A skill"\n---\n# Body\nContent.'
+        )
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("match directory" in e.lower() for e in errors)
+
+    def test_empty_markdown_body(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            '---\nname: my-skill\ndescription: "A skill"\n---\n'
+        )
+
+        skill, errors = _skills_mod.parse_skill(skill_dir)
+        assert skill is None
+        assert any("empty" in e.lower() and "body" in e.lower() for e in errors)
+
+
+class TestCommandValidationErrors:
+    """Error-case tests for command validation logic."""
+
+    def test_missing_frontmatter(self, tmp_path):
+        cmd_file = tmp_path / "command.md"
+        cmd_file.write_text("# No frontmatter\nJust content.")
+
+        with pytest.raises(ValueError, match="frontmatter"):
+            _commands_mod.parse_command(cmd_file)
+
+    def test_invalid_yaml(self, tmp_path):
+        cmd_file = tmp_path / "command.md"
+        cmd_file.write_text("---\n: [broken yaml\n---\n# Body")
+
+        with pytest.raises(ValueError, match="[Yy]AML"):
+            _commands_mod.parse_command(cmd_file)
+
+    def test_missing_description(self, tmp_path):
+        cmd_file = tmp_path / "command.md"
+        cmd_file.write_text("---\ntitle: something\n---\n# Body\nContent.")
+
+        with pytest.raises(ValueError, match="description"):
+            _commands_mod.parse_command(cmd_file)
+
+    def test_frontmatter_not_a_mapping(self, tmp_path):
+        cmd_file = tmp_path / "command.md"
+        cmd_file.write_text("---\n- a list item\n- another\n---\n# Body")
+
+        with pytest.raises(ValueError, match="mapping"):
+            _commands_mod.parse_command(cmd_file)
