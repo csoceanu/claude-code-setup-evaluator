@@ -19,7 +19,7 @@ Do NOT write any code, scaffold any project, or take any implementation action u
 2. **Ask clarifying questions** — one at a time, prefer multiple choice, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
 4. **Present design** — scale each section to its complexity, ask after each section if it looks right
-5. **Write spec** — save to `docs/specs/` and commit
+5. **Write spec** — save to `docs/specs/` (create directory if needed) and commit
 6. **User reviews spec** — wait for approval before proceeding
 7. **Transition** — invoke writing-plans skill to create implementation plan
 
