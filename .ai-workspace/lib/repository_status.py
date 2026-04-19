@@ -183,11 +183,42 @@ def _build_repo_xml(path: str, repo_path: Path, default_branch: str) -> str:
     return f'<repo {" ".join(attrs)} />'
 
 
+def _scan_repo_clones(repo_root: Path) -> list[dict[str, str]]:
+    """Scan repositories/ for cloned git repos (not submodules)."""
+    repos_dir = repo_root / "repositories"
+    if not repos_dir.exists():
+        return []
+
+    repos = []
+    for item in sorted(repos_dir.iterdir()):
+        if not item.is_dir() or item.name.startswith("."):
+            continue
+        if not (item / ".git").exists():
+            continue
+
+        branch = _get_current_branch(item)
+        uncommitted = _has_uncommitted_changes(item)
+        uncommitted_count = ""
+        if uncommitted:
+            status = _git(["status", "--porcelain"], item)
+            uncommitted_count = str(len(status.splitlines())) if status else "0"
+
+        repos.append({
+            "name": item.name,
+            "path": f"repositories/{item.name}",
+            "branch": branch,
+            "uncommitted": "true" if uncommitted else "false",
+            "uncommitted_count": uncommitted_count,
+        })
+
+    return repos
+
+
 def run_repository_status(ctx: SessionContext, repo_root: Path) -> None:
     """Gather repository status and add to session context.
 
-    Checks each submodule's git state and optionally the workspace root.
-    Produces nothing if no repositories are found.
+    Checks submodules, cloned repos in repositories/, and optionally
+    the workspace root. Produces nothing if no repositories are found.
     """
     config = load_config(repo_root / "ai-workspace.toml")
     gitmodules = _parse_gitmodules(repo_root)
@@ -213,6 +244,35 @@ def run_repository_status(ctx: SessionContext, repo_root: Path) -> None:
         default_branch = _get_default_branch(sub_path, full_path, gitmodules)
         repos.append(_build_repo_xml(sub_path, full_path, default_branch))
 
+    # Process cloned repos in repositories/
+    clones = _scan_repo_clones(repo_root)
+    for clone in clones:
+        # Skip if already reported as a submodule
+        if any(clone["path"] in r for r in repos):
+            continue
+        default_branch = _detect_default_branch(repo_root / clone["path"])
+        if not default_branch:
+            default_branch = _guess_default_branch(repo_root / clone["path"])
+        if not default_branch:
+            default_branch = _FALLBACK_DEFAULT_BRANCH
+        repos.append(_build_repo_xml(clone["path"], repo_root / clone["path"], default_branch))
+
     if repos:
         content = "<repository-status>\n" + "\n".join(repos) + "\n</repository-status>"
         ctx.add_section("repository-status", content)
+
+    # Build available-repositories section for repo focus prompt
+    if clones:
+        lines = ["<available-repositories>"]
+        for i, clone in enumerate(clones, 1):
+            status_hint = clone["branch"]
+            if clone["uncommitted"] == "true":
+                status_hint += f', {clone["uncommitted_count"]} uncommitted'
+            else:
+                status_hint += ", clean"
+            lines.append(
+                f'<repo index="{i}" name="{clone["name"]}" '
+                f'path="{clone["path"]}" status="{status_hint}" />'
+            )
+        lines.append("</available-repositories>")
+        ctx.add_section("available-repositories", "\n".join(lines))
