@@ -13,29 +13,23 @@ Welcome! This workspace gives you superpowers when working with AI coding assist
    uv sync
    ```
 
-2. **Fix symlinks** (required once after cloning — the committed symlinks point to the original author's machine):
-   ```bash
-   uv run .ai-workspace/scripts/transpile-commands.py
-   uv run .ai-workspace/scripts/transpile-skills.py
-   ```
-
-3. **Clone your repo** into the `repositories/` folder:
+2. **Clone your repo** into the `repositories/` folder:
    ```bash
    cd repositories/
    git clone <your-repo-url>
    cd ..
    ```
 
-4. **Start your AI tool** in the workspace root:
+3. **Start your AI tool** in the workspace root:
 
    | Tool | How to start |
    |---|---|
    | Claude Code | Run `claude` in the terminal |
    | Cursor | Open the workspace folder in Cursor |
 
-5. **Tell the AI which repo to focus on** — e.g., "work on site-analysis" or "I'm working on repositories/my-project."
+4. **Tell the AI which repo to focus on** — e.g., "work on site-analysis" or type `/focus` to pick from a list.
 
-6. **Type `/toolkit`** to see what's available and get recommendations based on your current repo.
+5. **Type `/toolkit`** to see what's available and get recommendations based on your current repo.
 
 That's it. Everything else activates automatically as you work.
 
