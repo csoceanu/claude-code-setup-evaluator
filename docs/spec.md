@@ -439,8 +439,12 @@ Step 3: Judging (9 Gemini calls)
   For each of the 9 with/without pairs:
     Send both responses to Gemini, blinded.
     Randomize which response is shown first (prevents position bias).
+    The judge prompt includes 2-3 calibration examples so Gemini knows
+    what "better" looks like (a clear win, a borderline case, a clear loss).
+    Gemini must write reasoning BEFORE giving a verdict (reduces random judging).
     Gemini picks the better response or calls it a tie.
-    Gemini explains its reasoning.
+    Parse the judge's JSON response defensively — try direct JSON first,
+    then code block extraction, then first {...} match. Never drop a result.
 
 Step 4: Aggregation
   Per-task verdict = majority of the 3 judgment runs.
@@ -473,16 +477,16 @@ Step 4: Aggregation
       "difficulty": "easy",
       "runs": [
         {
-          "judge_verdict": "with_skill",
-          "judge_reasoning": "Response A uses raise from for exception chaining and provides specific error messages with file path context. Response B uses bare except clauses."
+          "judge_reasoning": "Response A uses raise from for exception chaining and provides specific error messages with file path context. Response B uses bare except clauses.",
+          "judge_verdict": "with_skill"
         },
         {
-          "judge_verdict": "with_skill",
-          "judge_reasoning": "Response A defines a custom ConfigError hierarchy. Response B catches generic Exception."
+          "judge_reasoning": "Response A defines a custom ConfigError hierarchy. Response B catches generic Exception.",
+          "judge_verdict": "with_skill"
         },
         {
-          "judge_verdict": "with_skill",
-          "judge_reasoning": "Response A includes context managers and cleanup. Response B does not."
+          "judge_reasoning": "Response A includes context managers and cleanup. Response B does not.",
+          "judge_verdict": "with_skill"
         }
       ],
       "task_verdict": "with_skill"
@@ -493,6 +497,12 @@ Step 4: Aggregation
   "ties": 0,
   "losses": 0
 }
+```
+
+**Note on judge robustness:** The judge prompt and response parsing incorporate techniques from the [eval-layer](https://github.com/erezweinstein5/eval-layer) project:
+- **Calibration examples** in the judge prompt — 2-3 pre-graded examples (clear win, borderline, clear loss) so the judge has anchors and doesn't drift.
+- **Reasoning before verdict** — the judge must explain its thinking before picking a winner. This reduces random or lazy scoring.
+- **Defensive JSON parsing** — LLMs sometimes wrap JSON in markdown code blocks or add extra text. The parser tries direct JSON, then code block extraction, then first `{...}` match. Never crashes, never drops a result.
 ```
 
 **Dependencies** (PEP 723 inline):
@@ -543,7 +553,7 @@ The prompt instructs Claude to orchestrate the layers:
 
 2. **Generated tasks are biased toward the skill.** Because Gemini generates tasks from the skill's own description, the tasks test what the skill claims to do. A skill could ace its own tasks but still be useless in real-world usage (e.g., it triggers too broadly and pollutes unrelated conversations). Layer 2 partially compensates by evaluating trigger quality independently.
 
-3. **LLM-as-judge isn't perfect.** Gemini has known biases (prefers longer responses, prefers better formatting, position effects). We mitigate with blinding, randomized order, and majority-of-3 voting. Not eliminated.
+3. **LLM-as-judge isn't perfect.** Gemini has known biases (prefers longer responses, prefers better formatting, position effects). We mitigate with blinding, randomized order, majority-of-3 voting, calibration examples in the judge prompt, and requiring reasoning before verdict. Not eliminated, but significantly reduced.
 
 4. **Layer 2 is only as good as its rubric.** The evaluation criteria in the prompt need iteration based on real user feedback. The initial rubric is based on Anthropic's skill spec and Claude Code best practices, but edge cases will surface.
 
