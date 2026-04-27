@@ -113,14 +113,15 @@ TASKS: list[tuple[str, TaskFn]] = [
 NEXT_STEPS = """
 Setup complete! Next steps:
 
-  1. Add your repositories:
-     git submodule add <url> repositories/<name>
+  1. Clone your repos:
+     cd repositories/ && git clone <your-repo-url>
 
-  2. Edit AGENTS.project.md with your project-specific agent instructions
+  2. Start your AI tool from the workspace root:
+     claude  (or open in Cursor)
 
-  3. Edit ai-workspace.toml to configure the workspace
+  3. Tell the AI which repo to focus on, or type /focus
 
-  Docs: https://michaelyochpaz.github.io/ai-workspace-template/"""
+  See instructions.md for the full guide."""
 
 # ---------------------------------------------------------------------------
 # Main
