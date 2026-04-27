@@ -14,9 +14,9 @@ It works in three layers, each going deeper than the last:
 
 **Layer 1 — Count and check (Python script).** A script scans your skill files and does mechanical checks. It counts how many tokens each skill uses, detects near-duplicate skills using text similarity, checks if referenced files actually exist, and validates that each skill has proper formatting and a description. No AI involved — just parsing and math. Outputs a JSON report.
 
-**Layer 2 — Expert review (Claude in your session).** Claude — the one already running in your conversation — reads the output of layer 1 results plus every skill and command file and CLAUDE.md, and evaluates the whole setup according to pre-define best practices. Per skill: is it telling Claude something it doesn't already do by default? Is the description clear enough to trigger correctly? Are the instructions specific or vague? Across the setup: should some skills be merged? Should any skill be a command instead (or vice versa)? Does CLAUDE.md duplicate or conflict with skills? Is the total context budget reasonable? This costs nothing extra because Claude is already running.
+**Layer 2 — Expert review (Claude in your session).** Claude — the one already running in your conversation — reads the output of layer 1 results plus every skill and command file and CLAUDE.md, and evaluates the whole setup according to pre-define best practices. Per skill: is it telling Claude something it doesn't already do by default? Is the description clear enough to trigger correctly? Are the instructions specific or vague? Across the setup: should some skills be merged? Should any skill be a command instead (or vice versa)? Does CLAUDE.md duplicate or conflict with skills? Is the total context budget reasonable? Uses the Claude session already running.
 
-**Layer 3 — A/B experiment (optional).** Gemini generates test tasks from each skill's description. The Claude API runs those tasks twice — once with the skill loaded, once without. Then Gemini judges which output was better and provides a score + recommandation for future steps.
+**Layer 3 — A/B experiment (optional).** Gemini generates test tasks from each skill's description. The Claude API runs those tasks twice — once with the skill loaded, once without. Then Gemini judges which output was better and provides a score + recommendation for future steps.
 
 Layers 1 and 2 always run. Layer 3 is opt-in with `--deep` and requires API key from .env.
 
@@ -71,9 +71,9 @@ That's what the-evaluator does.
 
 ### 3.1 Three layers
 
-The system has three layers. The first two always run and are free. The third is optional and costs a few dollars.
+The system has three layers. The first two always run. The third is optional.
 
-**Layer 1: The robot inspector** (Python script, no AI, free, 2 seconds)
+**Layer 1: The robot inspector** (Python script, no AI)
 
 A Python script scans your skill files and checks the basics mechanically:
 - How many tokens does each skill use?
@@ -84,9 +84,9 @@ A Python script scans your skill files and checks the basics mechanically:
 
 This catches the obvious stuff — broken files, duplicates, missing fields. It outputs structured JSON that layer 2 uses.
 
-**Layer 2: Claude reviews your setup** (current session, free, ~30 seconds)
+**Layer 2: Claude reviews your setup** (current session)
 
-Claude — the one already running in your session, the one you're already paying for — reads the static analysis results AND reads each actual skill file, command file, and CLAUDE.md. Then it evaluates the whole setup according to pre-defined best practices:
+Claude — the one already running in your session — reads the static analysis results AND reads each actual skill file, command file, and CLAUDE.md. Then it evaluates the whole setup according to pre-defined best practices:
 
 - Is this skill telling Claude something it doesn't already know by default?
 - Is the description specific enough that Claude Code will activate it at the right time?
@@ -95,9 +95,9 @@ Claude — the one already running in your session, the one you're already payin
 - Does it conflict with other skills or CLAUDE.md?
 - Should any skills be merged? Should any skill be a command instead (or vice versa)?
 
-This costs nothing extra because Claude is already running in your session.
+Uses the Claude session already running.
 
-**Layer 3: The science experiment** (optional, requires API keys, ~$0.15 per skill)
+**Layer 3: The science experiment** (optional, requires API keys)
 
 For users who want empirical proof, not just an expert opinion. This requires `ANTHROPIC_API_KEY` and `GEMINI_API_KEY` in your `.env` file.
 
@@ -117,7 +117,7 @@ Here's what happens for each skill:
 User types: /evaluate-setup
 
   +----------------------------------+
-  |  Layer 1: Static analysis        |  Free, instant
+  |  Layer 1: Static analysis        |
   |  Python script, no AI            |
   |  Token counts, duplicates,       |
   |  broken refs, format checks      |
@@ -125,7 +125,7 @@ User types: /evaluate-setup
                    | JSON output
                    v
   +----------------------------------+
-  |  Layer 2: Claude review          |  Free (current session)
+  |  Layer 2: Claude review          |  Current session
   |  Reads JSON + skill/command      |
   |  files + CLAUDE.md               |
   |  Evaluates quality, redundancy,  |
@@ -138,11 +138,10 @@ User types: /evaluate-setup
           no              yes
           |                |
      Done. Show     Check for API keys.
-     report.        Show cost estimate.
-                    User confirms.
+     report.        User confirms.
                            |
                    +-------v--------------+
-                   |  Layer 3: A/B eval   |  ~$0.15/skill
+                   |  Layer 3: A/B eval   |
                    |  Gemini writes tasks  |
                    |  Claude API runs     |
                    |  with + without      |
@@ -179,16 +178,16 @@ The user types `/evaluate-setup` inside Claude Code with optional arguments:
   Claude asks what to evaluate, or scans the default ~/.claude/ path.
 
 /evaluate-setup ~/.claude/skills/
-  Check all skills. Layers 1+2. Free.
+  Check all skills. Layers 1+2.
 
 /evaluate-setup ~/.claude/skills/python-error-handling/
-  Check just one skill. Layers 1+2. Free.
+  Check just one skill. Layers 1+2.
 
 /evaluate-setup ~/.claude/ --deep
-  Full evaluation with A/B testing. Claude warns about cost first.
+  Full evaluation with A/B testing.
 
 /evaluate-setup ~/.claude/skills/react-helper/ --deep
-  Deep eval on one suspicious skill. Cheap (~$0.15).
+  Deep eval on one suspicious skill.
 ```
 
 Natural language works too. The command prompt tells Claude to handle things like:
@@ -257,14 +256,13 @@ Analyzing setup at ~/.claude/skills/ ...
   Review:  3 skills
 
   3 skills scored poorly. Want me to run deep evaluation on those?
-  It'll make ~54 API calls, estimated cost ~$0.50.
   Requires ANTHROPIC_API_KEY and GEMINI_API_KEY in your .env.
 ```
 
 ### 4.4 Safety
 
 - **Read-only.** The tool never modifies, moves, or deletes any files. It only recommends.
-- **Cost controls.** Deep evaluation shows a cost estimate and asks for confirmation before making any API calls.
+- **Confirmation.** Deep evaluation asks for confirmation before making any API calls.
 - **Privacy.** No data leaves your machine except API calls to Anthropic and Google (layer 3 only). Layers 1+2 are completely local.
 
 ---
@@ -464,8 +462,6 @@ Step 4: Aggregation
 | Gemini (blind judge) | 9 |
 | **Total** | **28** |
 
-**Cost:** ~$0.10-0.25 per skill depending on task complexity and skill length.
-
 **Output:** JSON to stdout. Example:
 
 ```json
@@ -517,8 +513,8 @@ The prompt instructs Claude to orchestrate the layers:
 2. **Always** read the actual skill files and evaluate them against the criteria (layer 2).
 3. Produce the report with star ratings, verdicts, and recommendations.
 4. **After** the report:
-   - If the user passed `--deep`: check for API keys in environment, show cost estimate, ask for confirmation, then run `deep_eval.py` on the requested skills.
-   - If the user did NOT pass `--deep` but some skills scored 2 stars or below: suggest running deep eval on just those few skills (cheap, targeted).
+   - If the user passed `--deep`: check for API keys in environment, ask for confirmation, then run `deep_eval.py` on the requested skills.
+   - If the user did NOT pass `--deep` but some skills scored 2 stars or below: suggest running deep eval on just those few skills (targeted).
 5. If layer 3 ran, incorporate the A/B results into the final report — each skill's verdict card gets a line showing win/loss/tie counts and whether the A/B evidence confirms or contradicts the layer 2 assessment.
 
 ---
@@ -575,7 +571,7 @@ These need answers before or during v1 development:
 
 1. **What is Claude's baseline behavior list?** The redundancy check needs a comprehensive list of things Claude already does without any skill. This needs research — read Anthropic's documentation, test Claude's default behavior on common tasks, and compile the list. Getting this wrong means false positives (flagging useful skills as redundant) or false negatives (missing actually redundant ones).
 
-2. **Which Claude model for layer 3?** Sonnet is more representative of real usage but costs more per call. Haiku is cheaper but might not surface subtle quality differences. Recommendation: default to Sonnet, offer `--model haiku` flag for budget-conscious users.
+2. **Which Claude model for layer 3?** Sonnet is more representative of real usage. Haiku is faster but might not surface subtle quality differences. Recommendation: default to Sonnet, offer `--model haiku` flag.
 
 3. **How to evaluate preventive skills?** Skills like "never commit secrets" or "always run tests before committing" are meant to prevent bad outcomes, not improve positive outcomes. The A/B test methodology (which compares quality of output) doesn't naturally capture "did it avoid doing something dangerous?" This needs a different evaluation approach — probably adversarial tasks designed to trigger the bad behavior.
 
@@ -592,7 +588,7 @@ v1 is successful if:
 1. A user can clone the repo and run `/evaluate-setup` on a real `.claude/` folder in **under 2 minutes**.
 2. At least **80% of the verdicts feel correct** to the user on manual inspection.
 3. Running it on a typical bloated setup identifies at least **2-3 genuinely removable skills**.
-4. Layer 3 deep eval on 5 skills costs **under $1.50**.
+4. Layer 3 deep eval on 5 skills completes successfully.
 5. A user who knows nothing about skill best practices can **read the report and decide what to do** without needing to look anything up.
 
 ---
