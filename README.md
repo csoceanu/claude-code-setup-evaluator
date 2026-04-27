@@ -9,22 +9,22 @@ AI assistants work great in a single repo, but our team works across multiple pr
 - **Shared skills** — team knowledge baked into the AI (dotenv patterns, pipeline design, security checks, TDD workflows, and more)
 - **Shared commands** — `/verify`, `/review`, `/quality-gate`, `/plan`, `/refactor-safe`, `/recap` and more — the same workflows everywhere
 - **Cross-repo visibility** — all our repos in one workspace, so the AI can see and work across project boundaries
-- **Onboarding in minutes** — new team members (or new repos) get the full AI setup immediately
+- **Fast onboarding** — new team members (or new repos) get the full AI setup immediately
 
 ## Setup (one time)
 
 ```bash
 # Clone the workspace
-git clone git@gitlab.cee.redhat.com:bkapner/ai-workspace-template-ds.git
+git clone <workspace-repo-url>
 cd ai-workspace-template-ds
 
-# Install dependencies
+# Install dependencies and set up hooks
 uv sync
+uv run .ai-workspace/scripts/setup.py
 
 # Clone whatever repos you work on
 cd repositories/
-git clone git@gitlab.cee.redhat.com:bkapner/site-analysis.git
-git clone git@gitlab.cee.redhat.com:bkapner/ai-initiatives-observer.git
+git clone <your-repo-url>
 cd ..
 ```
 
@@ -80,7 +80,7 @@ Pushes go to the repo's own remote. The workspace is never involved.
 
 ## What You DON'T Need To Do
 
-- **Don't memorize skills.** There are 7 of them (security, pipelines, testing, etc.) — they activate automatically when relevant. You just get better results without thinking about it.
+- **Don't memorize skills.** There are 6 of them (security, pipelines, conventions, etc.) — they activate automatically when relevant. You just get better results without thinking about it.
 - **Don't configure anything per-repo.** The workspace handles it.
 - **Don't worry about pushing to the wrong repo.** Your repos are independent clones. `git push` from inside a repo goes to that repo's remote.
 
@@ -98,7 +98,7 @@ Claude: [reads the code, uses python-conventions skill automatically]
 
 You: /plan looks good, go ahead
 
-Claude: [implements, uses python-testing skill to write tests first]
+Claude: [implements, uses python-conventions skill to write tests first]
 
 You: /verify
 
@@ -130,7 +130,7 @@ Claude: ## What was done
 | Directory | What it is |
 |---|---|
 | `repositories/` | Your repos — clone what you need here |
-| `skills/` | 8 AI skills — team patterns, security, testing, pipelines, and more |
+| `skills/` | 6 AI skills — team patterns, security, conventions, pipelines, and more |
 | `commands/` | 17 slash commands — `/plan`, `/verify`, `/review`, `/quality-gate`, etc. |
 | `agent-docs/` | On-demand documentation the AI reads when relevant (writing skills guide, subagent development, etc.) |
 | `.cursor/rules/` | Same skills, formatted for Cursor |
