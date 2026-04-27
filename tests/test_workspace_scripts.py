@@ -44,24 +44,25 @@ _commands_mod = _import_script("transpile-commands.py")
 
 
 class TestAlignWorkspace:
-    def test_runs_successfully(self):
+    @pytest.fixture(autouse=True, scope="class")
+    def align_result(self):
         result = run_script("align-workspace.py")
-        assert result.returncode == 0, f"align-workspace failed: {result.stderr}"
+        TestAlignWorkspace._result = result
+
+    def test_runs_successfully(self):
+        assert self._result.returncode == 0, f"align-workspace failed: {self._result.stderr}"
 
     def test_generates_agents_md(self):
-        run_script("align-workspace.py")
         agents_md = ROOT / "AGENTS.md"
         assert agents_md.exists(), "AGENTS.md not generated"
         content = agents_md.read_text()
         assert len(content) > 100, "AGENTS.md is suspiciously short"
 
     def test_agents_md_contains_project_context(self):
-        run_script("align-workspace.py")
         content = (ROOT / "AGENTS.md").read_text()
         assert "Data Science team" in content, "Project context missing from AGENTS.md"
 
     def test_agents_md_contains_critical_requirements(self):
-        run_script("align-workspace.py")
         content = (ROOT / "AGENTS.md").read_text()
         assert "Critical Requirements" in content
 
@@ -220,6 +221,27 @@ class TestSkillValidationErrors:
         skill, errors = _skills_mod.parse_skill(skill_dir)
         assert skill is None
         assert any("empty" in e.lower() and "body" in e.lower() for e in errors)
+
+
+class TestSkillSuggestHook:
+    """Validate that skill-suggest.sh only references skills that actually exist."""
+
+    def test_all_suggested_skills_exist(self):
+        hook_path = ROOT / ".ai-workspace" / "scripts" / "skill-suggest.sh"
+        hook_content = hook_path.read_text()
+
+        existing_skills = {
+            p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")
+        }
+
+        import re
+
+        suggested = set(re.findall(r'SKILLS="\$SKILLS\s+([a-z0-9-]+)"', hook_content))
+        ghost_skills = suggested - existing_skills
+        assert not ghost_skills, (
+            f"skill-suggest.sh references non-existent skills: {ghost_skills}. "
+            f"Existing skills: {existing_skills}"
+        )
 
 
 class TestCommandValidationErrors:
