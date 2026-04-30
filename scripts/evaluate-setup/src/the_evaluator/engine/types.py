@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Optional, Protocol
+
+
+class Severity(str, Enum):
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class RuleCategory(str, Enum):
+    STRUCTURAL = "structural"
+    FRONTMATTER = "frontmatter"
+    CONTENT = "content"
+    SECURITY = "security"
+    BEST_PRACTICES = "best_practices"
+
+
+@dataclass(frozen=True)
+class DiagnosticLocation:
+    file: str
+    start_line: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class DiagnosticFix:
+    description: str
+    replacement: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class Diagnostic:
+    rule_id: str
+    severity: Severity
+    message: str
+    location: DiagnosticLocation
+    category: RuleCategory
+    fix: Optional[DiagnosticFix] = None
+
+
+@dataclass
+class RuleMeta:
+    id: str
+    default_severity: Severity
+    fixable: bool
+    description: str
+    category: RuleCategory
+    messages: dict[str, str]
+
+
+@dataclass
+class ReportDescriptor:
+    message_id: str
+    data: Optional[dict[str, str | int]] = None
+    location: Optional[DiagnosticLocation] = None
+    fix: Optional[DiagnosticFix] = None
+    severity_override: Optional[Severity] = None
+
+
+@dataclass
+class ParsedSkill:
+    dir_path: str
+    dir_name: str
+    skill_md_path: str
+    raw_content: str
+    frontmatter: dict[str, Any]
+    raw_frontmatter: str
+    frontmatter_start_line: int
+    body: str
+    body_start_line: int
+    files: list[str]
+    parse_errors: list[str] = field(default_factory=list)
+    tokens: int = 0
+
+
+@dataclass
+class RuleContext:
+    skill: ParsedSkill
+    report: Callable[[ReportDescriptor], None]
+    severity: Severity
+    options: list[Any] = field(default_factory=list)
+
+
+@dataclass
+class LintResult:
+    skill_path: str
+    skill_name: str
+    tokens: int
+    diagnostics: list[Diagnostic] = field(default_factory=list)
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+    fixable_count: int = 0
+    suppression_count: int = 0
+
+
+class Rule(Protocol):
+    meta: RuleMeta
+
+    def create(self, context: RuleContext) -> None: ...
