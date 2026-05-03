@@ -1,7 +1,7 @@
 # the-evaluator
 
 **Status:** v1.2 scope defined · built (Layers 1+2), Layer 3 needs API keys to test
-**Author:** project lead (Red Hat data scientist) + design review with Claude
+**Author:** Benjamin Kapner + design review with Claude
 **Last updated:** May 2026
 **Changes from v1.1:** Removed auto-fix (`--fix`). Added Layer 1 rules for commands (2 rules), CLAUDE.md (3 rules), and hooks (1 rule) — total 15 rules across 4 file types. Added interactive Step 0 (ask user about output format and scope before starting). Added cross-type optimization suggestions (skill→hook, skill→command, CLAUDE.md→skill, etc.). Added numbered suggestions in summary so users can say "do 1, skip 2". Added hard rules: never verdict without rubric, don't manufacture problems.
 **Changes from v1.0:** Rule engine architecture for Layer 1 (inspired by [skilleval](https://github.com/natifridman/skilleval)), config presets, inline suppression, structured rubric scoring for Layer 2 (inspired by [deepeval](https://github.com/confident-ai/deepeval)), red-team mode for preventive skills (inspired by [promptfoo](https://github.com/promptfoo/promptfoo) and [giskard](https://github.com/Giskard-AI/giskard)), repeat-and-vote judge reliability. Single-skill mode, CLAUDE.md evaluation rubric, command evaluation rubric.
@@ -413,7 +413,7 @@ the-evaluator/
             security.py            # Security rules only
 ```
 
-`prompt.md` is the brain — it tells Claude what to do, what rubric to evaluate against, and how to format the output. The rule engine and Python scripts are the hands — they do the mechanical work that Claude can't or shouldn't do itself.
+`command.md` is the brain — it tells Claude what to do, what rubric to evaluate against, and how to format the output. The rule engine and Python scripts are the hands — they do the mechanical work that Claude can't or shouldn't do itself.
 
 ### 5.2 Layer 1 details: rule engine
 
@@ -827,7 +827,7 @@ The engine parses these before running rules. Suppressed diagnostics are silentl
 
 ### 5.3 Layer 2 details: the command prompt
 
-The command prompt (`prompt.md`) is where the product logic lives. It encodes the evaluation criteria that Claude applies to each skill, command, and CLAUDE.md file. This is the part that requires the most craft — it's the difference between a generic "look at these files" and a rigorous quality audit.
+The command prompt (`command.md`) is where the product logic lives. It encodes the evaluation criteria that Claude applies to each skill, command, and CLAUDE.md file. This is the part that requires the most craft — it's the difference between a generic "look at these files" and a rigorous quality audit.
 
 **The prompt instructs Claude to:**
 

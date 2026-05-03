@@ -1,0 +1,4 @@
+# Each user clones their own repos here — nothing is shared or tracked.
+*
+!.gitignore
+!.gitkeep

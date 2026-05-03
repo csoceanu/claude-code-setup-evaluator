@@ -90,7 +90,7 @@ else
 fi
 
 # Test 7: Pipeline file → data-pipeline-patterns
-export CLAUDE_TOOL_INPUT='{"file_path": "/home/user/scripts/fetch_jira_data.py"}'
+export CLAUDE_TOOL_INPUT='{"file_path": "/home/user/scripts/fetch_data.py"}'
 OUTPUT=$(bash "$PROJECT_DIR/.ai-workspace/scripts/skill-suggest.sh" 2>&1)
 if echo "$OUTPUT" | grep -q "data-pipeline-patterns"; then
     pass "Skill suggest: pipeline file → data-pipeline-patterns"
