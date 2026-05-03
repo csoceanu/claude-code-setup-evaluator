@@ -6,17 +6,39 @@ description: "Evaluate your Claude Code setup — skills, commands, CLAUDE.md. I
 
 You are running **the-evaluator** — a health check for Claude Code setups. You will evaluate skills, commands, and CLAUDE.md files, then produce a report with verdicts and recommendations.
 
+## Hard Rules
+
+1. **Never give a verdict without running the rubric.** You MUST read the actual file content and score all rubric dimensions before assigning a star rating or verdict. Layer 1 error/warning counts are input data, not the verdict — a file with 10 false-positive warnings can still be ★★★★★.
+2. **Every item must have a full rubric score block.** If a rubric score block is missing for any evaluated item, the review is incomplete. Every skill, command, CLAUDE.md, and hook MUST have all dimensions scored with one-sentence justifications before the verdict line. No exceptions, no shortcuts.
+3. **Read before you judge.** Do not summarize an item based on Layer 1 output alone. You must read the actual file content to evaluate quality, clarity, and redundancy. Layer 1 catches mechanical issues. Layer 2 catches everything else.
+4. **Don't manufacture problems.** If the setup is good, say so. Not every run needs to produce a list of changes. A healthy setup with minor cosmetic issues should get a clear "your setup is solid" verdict — not a long list of suggestions that creates unnecessary work. Only recommend changes that would make a real difference. "You could trim 50 tokens from this skill" is not a real recommendation. "This skill duplicates another and wastes 1,000 tokens every session" is.
+5. **Always end with a short summary.** Regardless of output format, the last thing the user sees in the terminal must be a short summary (see Step 5b). The full review is either above in the terminal or saved to a file — the summary tells the user the bottom line and where to find details.
+
+## Step 0: Ask the User Before Starting
+
+Before running anything, ask the user two questions using AskUserQuestion:
+
+1. **Output format:** "Where do you want the full review?"
+   - **Terminal** — print everything here (can be long)
+   - **File** — save to `evaluate-setup-report.md` in the project root (recommended for full setup scans)
+
+2. **Scope:** "What do you want to evaluate?"
+   - **Everything** — skills + commands + CLAUDE.md + hooks
+   - **Skills only**
+   - **A specific item** — ask which one
+
+Wait for answers before proceeding. The user's choices determine where output goes and what gets scanned.
+
 ## Arguments
 
 `$ARGUMENTS` may include:
 - A path (e.g., `~/.claude/skills/`, `skills/python-conventions/`)
 - `--preset strict` or `--preset security` (default: recommended)
-- `--fix` (auto-fix trivial formatting issues)
 - `--deep` (run Layer 3 A/B evaluation — requires API keys)
 - `--deep --red-team` (adversarial testing for preventive skills)
 - Natural language like "evaluate my setup", "is my python skill any good?"
 
-If no path is given, ask the user what to evaluate or default to scanning the current directory's skills.
+If no path is given and the user didn't answer Step 0 (e.g., they passed arguments directly), default to scanning skills in the current directory with terminal output.
 
 ## Step 1: Run Layer 1 (Static Analysis)
 
@@ -31,12 +53,10 @@ PROJECT_DIR="$(echo "$ANALYZER" | sed 's|/src/the_evaluator/cli.py||')"
 Run the analysis:
 
 ```bash
-uv run --project "$PROJECT_DIR" evaluate-setup scan <PATH> [--preset <PRESET>] [--fix]
+uv run --project "$PROJECT_DIR" evaluate-setup scan <PATH> [--preset <PRESET>]
 ```
 
-Read the JSON output. This gives you per-skill diagnostics with rule IDs, severities, token counts, and fixable issues.
-
-If `--fix` was requested, report what was auto-fixed before proceeding.
+Read the JSON output. This gives you per-skill diagnostics with rule IDs, severities, and token counts.
 
 ## Step 2: Read Actual Files (Layer 2 Preparation)
 
@@ -124,40 +144,147 @@ A skill is NOT redundant if it provides specific, actionable rules. "Always use 
   x What's broken (from Layer 1 diagnostics)
 ```
 
-## Step 4: Setup-Wide Recommendations
+## Step 3b: Evaluate CLAUDE.md (if --claude-md or --all)
 
-After grading all skills individually, evaluate the **whole setup**:
+Score CLAUDE.md on 5 dimensions:
+
+| Dimension | Weight | What to check |
+|---|---|---|
+| **Conciseness** | 0.25 | Under ~300 lines? Can each line pass "would removing this cause mistakes?" |
+| **Signal-to-noise** | 0.25 | Only contains things Claude can't figure out from code? No generic advice? |
+| **Skill separation** | 0.20 | Domain-specific rules are in skills (on-demand), not CLAUDE.md (every session)? |
+| **Structure** | 0.15 | Clear sections? Critical rules marked? Scannable? |
+| **Conflict-free** | 0.15 | No contradictions with any skill? |
+
+## Step 3c: Evaluate Commands (if --commands or --all)
+
+Score each command on 5 dimensions:
+
+| Dimension | Weight | What to check |
+|---|---|---|
+| **Description quality** | 0.25 | Clear, concise description for the UI menu? |
+| **Instruction clarity** | 0.25 | Claude knows exactly what to do, in what order? |
+| **Script integrity** | 0.20 | Referenced scripts exist? Discovery pattern works? |
+| **Scope appropriateness** | 0.15 | Should this be a command (user-triggered) or a skill (auto-triggered)? |
+| **Token efficiency** | 0.15 | Concise or bloated? |
+
+## Step 3d: Evaluate Hooks (if --hooks or --all)
+
+For each hook, check:
+- Does the hook have a clear purpose?
+- Does the referenced script/command exist?
+- Are there dangerous patterns (rm -rf, force push)?
+- Is this the right mechanism? (hooks are deterministic — 100% execution. If the behavior is advisory, it should be in CLAUDE.md or a skill instead.)
+
+## Step 4: Cross-Type Optimization (the full picture)
+
+This is where you look at the **whole setup** and suggest transformations between types. Only suggest transformations when you genuinely believe they would improve the setup — don't suggest changes for the sake of it.
+
+### Transformation types to consider:
+
+**Skill → Hook** — If a skill contains rules that MUST happen every time without exception (e.g., "always run linting after editing"), that's a hook, not a skill. Skills are advisory (~80% adherence). Hooks are deterministic (100%). Ask: "If Claude ignores this instruction, would something break?" If yes → hook.
+
+**Skill → Command** — If a skill describes a specific workflow the user triggers explicitly (e.g., "audit my code", "generate a migration", "deploy to staging"), it should be a command. Skills are for passive behavior ("whenever you write Python, do X"). Commands are for active actions the user invokes with `/command-name`.
+
+**Command → Skill** — If a command describes general behavior that should always be active (e.g., a `/python-style` command that the user runs every time), it should be a skill that auto-triggers.
+
+**Skill content → CLAUDE.md** — If a skill contains rules that apply to EVERY conversation regardless of task (e.g., "always use uv for Python", "never commit .env files"), those belong in CLAUDE.md. Skills load on-demand; CLAUDE.md loads every session. Universal rules should be in CLAUDE.md.
+
+**CLAUDE.md content → Skill** — The reverse. If CLAUDE.md contains domain-specific rules that only matter sometimes (e.g., "when writing data pipelines, use this stage structure"), those waste context in every session. Move them to a skill that loads only when relevant.
+
+**CLAUDE.md content → Hook** — If CLAUDE.md says "always run tests before committing" but Claude sometimes forgets — make it a hook. The hook guarantees it happens.
+
+### Setup-wide checks:
 
 - **Merge candidates**: Skills covering related topics that would be stronger combined
-- **Skill → command conversion**: Skills describing explicit workflows that should be user-triggered commands
-- **Command → skill conversion**: Commands describing general behavior that should auto-trigger
-- **CLAUDE.md review**: Is it too long? Does it duplicate skills? Does it conflict? Is it well-structured?
-- **Overlapping triggers**: Groups of skills whose descriptions might cause multiple to load unnecessarily
+- **Overlapping triggers**: Skills whose descriptions might cause multiple to load unnecessarily
 - **Coverage gaps**: Obvious missing areas based on what's present
-- **Total context budget**: Sum all skills + CLAUDE.md tokens, warn if >20% of context window
+- **Total context budget**: Sum all skills + CLAUDE.md + commands tokens, warn if >20% of context window
+- **Redundancy across types**: Same instruction appearing in CLAUDE.md AND a skill (double token cost)
+- **Conflicts across types**: CLAUDE.md says one thing, a skill says the opposite
+
+### Example transformation suggestions:
+
+```
+## Cross-Type Optimization
+
+  ⟳ Skill → Hook: security-check says "always run pre-commit before pushing" —
+    this should be a hook to guarantee it runs every time, not a skill that
+    Claude might skip.
+
+  ⟳ Skill → Command: brainstorming says "you MUST use this before any creative work" —
+    the hard gate makes it behave like a command. Consider making it a /brainstorm
+    command instead.
+
+  ⟳ CLAUDE.md → Skill: The "Testing" section in CLAUDE.md (lines 45-60) contains
+    pytest-specific rules that only matter when writing tests. Move to a
+    testing-conventions skill that loads on demand.
+
+  ✓ No conflicts detected between CLAUDE.md and skills.
+  ✓ No redundant content detected across types.
+```
 
 ## Step 5: Produce the Report
 
-Output the report in this format:
+### Step 5a: Full Review
+
+If the user chose **terminal output**, print the full review directly. If they chose **file output**, write it to `evaluate-setup-report.md` in the project root and tell the user where to find it.
+
+Full review format:
 
 ```
 ## Static Analysis (Layer 1)
-  Preset: <preset> | <N> skills found | <tokens> tokens total (<pct>% of context budget)
+  Preset: <preset> | <N> skills, <M> commands, <K> other items
+  <tokens> tokens total (<pct>% of context budget)
   <errors> errors | <warnings> warnings | <info> info
-  <fixable> fixable with --fix
+  <fixable> auto-fixable issues found
 
-## Per-Skill Review (Layer 2)
-  [Per-skill rubric output as shown above, one per skill]
+## Per-Item Review (Layer 2)
+
+### Skills
+  [Per-skill rubric output, one per skill]
+
+### CLAUDE.md (if evaluated)
+  [CLAUDE.md rubric output]
+
+### Commands (if evaluated)
+  [Per-command rubric output]
+
+### Hooks (if evaluated)
+  [Per-hook review]
+
+## Cross-Type Optimization
+  [Transformation suggestions — only when genuinely beneficial]
 
 ## Setup-Wide Recommendations
-  [Bullet points for each recommendation]
-
-## Summary
-  Keep:    N skills (total: X tokens)
-  Remove:  N skills (total: X tokens)  <- potential savings
-  Review:  N skills
-  Fixable: N issues (run with --fix to auto-correct)
+  [Merge candidates, overlapping triggers, coverage gaps, context budget]
 ```
+
+### Step 5b: Terminal Summary (ALWAYS printed, regardless of output format)
+
+This is the last thing the user sees. Keep it short — 10-15 lines max. It tells the user the bottom line.
+
+```
+## Evaluation Summary
+
+<Overall verdict — one sentence. E.g., "Your setup is solid" or "Found 2 issues that need attention.">
+Reviewed <N> skills, <M> commands, CLAUDE.md. Total: <tokens> tokens (<pct>%).
+
+Suggestions (say "do 1", "do 2", "skip 3" to act on them):
+  1. <one-line suggestion>
+  2. <one-line suggestion>
+  3. <one-line suggestion>
+
+Full review: <"printed above" or "saved to evaluate-setup-report.md">
+```
+
+**Numbering rules:**
+- Every suggestion gets a number, starting from 1
+- Each number is one actionable item Claude can execute if the user says "do N"
+- Keep each suggestion to one line — the full explanation is in the detailed review
+- If the setup is healthy, it's fine to have just 1-2 suggestions or even zero. Don't pad.
+
+**Key principle:** If nothing significant needs to change, say "your setup is solid" and list only the minor items. Don't pad the summary with nice-to-have suggestions. The user should be able to read the summary in 10 seconds and know: do I need to act or not?
 
 ## Step 6: Deep Evaluation (Layer 3 — only if --deep was passed)
 
