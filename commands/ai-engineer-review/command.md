@@ -146,5 +146,5 @@ THINGS I WOULDN'T CHANGE:
 
 $ARGUMENTS can specify:
 - A specific area: `/ai-engineer-review architecture`, `/ai-engineer-review security`, `/ai-engineer-review skills`
-- A specific repo: `/ai-engineer-review repositories/ai-initiatives-observer`
+- A specific repo: `/ai-engineer-review repositories/my-project`
 - Default: review the entire workspace

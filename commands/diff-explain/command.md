@@ -72,7 +72,7 @@ CHANGES EXPLAINED
 
 SUMMARY:
   The monolithic epic analysis script was split into 3 independent
-  pipeline steps, and closed Jira issues are now kept for context
+  pipeline steps, and closed issues are now kept for context
   instead of being discarded.
 
 CHANGE 1: Split summarize_epics.py into 3 scripts
@@ -86,12 +86,12 @@ CHANGE 1: Split summarize_epics.py into 3 scripts
          scripts/filter_standalone_tasks.py (new), main.py
 
 CHANGE 2: Keep closed issues as lightweight entries
-  What: Previously, 66% of fetched Jira issues were discarded because
+  What: Previously, 66% of fetched records were discarded because
         they were closed. Now they're kept with just title, assignee,
         and dates — no description or comments.
   Why:  The AI can now see the full picture of what was accomplished
         vs what's still in progress, giving richer executive reports.
-  Files: scripts/fetch_jira_data.py, prompts/epic_prompts.py,
+  Files: scripts/fetch_data.py, prompts/epic_prompts.py,
          prompts/category_prompts.py
 ```
 

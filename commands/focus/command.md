@@ -35,9 +35,9 @@ Show the numbered list:
 ```
 REPOSITORY FOCUS
 ================
-  1. ai-initiatives-observer     (main, clean)
-  2. site-analysis                (feature/add-retry, 3 uncommitted)
-  3. igloo-mcp                    (main, clean)
+  1. my-project                   (main, clean)
+  2. backend-api                  (feature/add-retry, 3 uncommitted)
+  3. frontend-app                 (main, clean)
 
 Which repo(s)? (e.g. 1, 1-3, all, all except 2)
 ```
@@ -45,7 +45,7 @@ Which repo(s)? (e.g. 1, 1-3, all, all except 2)
 If there is a current focus, mark it:
 
 ```
-  2. site-analysis                (feature/add-retry, 3 uncommitted)  [current]
+  2. backend-api                  (feature/add-retry, 3 uncommitted)  [current]
 ```
 
 ### Step 3: Apply Selection
@@ -57,12 +57,12 @@ The user's response **completely replaces** the previous focus. Parse their sele
 - `1-3` → range
 - `all` → all repos
 - `all except 2` → all minus specific ones
-- Repo names also work: `site-analysis`
+- Repo names also work: `backend-api`
 
 ### Step 4: Confirm
 
 ```
-Focused on: site-analysis, igloo-mcp
+Focused on: backend-api, frontend-app
 ```
 
 Then continue working. Apply the same focus constraint: only read/modify files in the selected repo(s) unless the user explicitly asks otherwise.

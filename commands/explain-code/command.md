@@ -73,7 +73,7 @@ PRACTICAL NOTES:
 ## Arguments
 
 $ARGUMENTS can specify:
-- A file: `/explain-code src/pipeline/jira_client.py`
+- A file: `/explain-code src/pipeline/api_client.py`
 - A function: `/explain-code fetch_tickets`
 - A module: `/explain-code src/pipeline/`
 - A concept: `/explain-code "how does the retry logic work"`

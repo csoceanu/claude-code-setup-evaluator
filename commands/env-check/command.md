@@ -71,5 +71,5 @@ Result: 1 FAIL, 1 WARN — fix before proceeding
 ## Arguments
 
 $ARGUMENTS can be:
-- A repo path (e.g., `repositories/site-analysis`) — check that repo specifically
+- A repo path (e.g., `repositories/backend-api`) — check that repo specifically
 - Empty — check the current working directory or the repo the user is focused on

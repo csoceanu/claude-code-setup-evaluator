@@ -67,7 +67,7 @@ LLM called: Yes (gemini-2.5-flash-preview)
 Test 1: Person with 50 issues
   Completeness:  PASS — all fields populated
   Format:        PASS — SUMMARY/PRODUCTS/TECHNOLOGIES/WORK_FOCUS present
-  Grounding:     PASS — references specific Jira projects and technologies
+  Grounding:     PASS — references specific projects and technologies
   Parseability:  PASS — parse_person_summary extracted all fields
 
 Test 2: Person with 2 issues

@@ -43,11 +43,11 @@ How does it fit in?
 
 ## Example
 
-For a file like `scripts/fetch_jira_data.py`:
+For a file like `scripts/fetch_data.py`:
 
 ```
 What is this?
-This is a script that downloads work tickets from Jira (a tool teams use to track tasks).
+This is a script that downloads records from an external API.
 
 Why does it exist?
 We want to know what everyone is working on, but that information is scattered across
@@ -55,7 +55,7 @@ thousands of tickets. This script collects all of them automatically.
 
 How does it work?
 - It goes through a list of people and looks up their tickets, one person at a time
-- It's polite about it — if Jira says "slow down", it waits before asking again
+- It's polite about it — if the server says "slow down", it waits before asking again
 - For each ticket, it also grabs the parent project it belongs to, so we get the full picture
 - It saves everything into one big file that other scripts can use later
 
@@ -75,6 +75,6 @@ everything gets organized into a report (step 4).
 
 $ARGUMENTS can be:
 - A file path (e.g., `scripts/summarize_people.py`)
-- A folder (e.g., `repositories/site-analysis`)
+- A folder (e.g., `repositories/backend-api`)
 - A concept (e.g., "the pipeline", "the chat script")
 - Empty — explain the current project root

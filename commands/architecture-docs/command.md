@@ -118,6 +118,6 @@ Use Mermaid syntax for all diagrams — renders natively in GitLab/GitHub.
 
 $ARGUMENTS can specify:
 - `--quick` or `quick`: Quick Mermaid diagram only (no full documentation)
-- A specific repo: `/architecture-docs repositories/ai-initiatives-observer`
+- A specific repo: `/architecture-docs repositories/my-project`
 - A specific focus: `/architecture-docs data-flow` or `/architecture-docs decisions`
 - Default: full documentation for the current workspace

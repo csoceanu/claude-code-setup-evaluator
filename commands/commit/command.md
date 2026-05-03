@@ -60,19 +60,19 @@ Use conversation context to get this right. If the user spent the session debugg
 - Specific — name the thing that changed
 
 **Examples of good messages:**
-- `Add exponential backoff to Jira API client`
+- `Add exponential backoff to REST API client`
 - `Fix silent failure on 429 responses`
 - `Remove unused config loader`
 - `Update pipeline to checkpoint every 100 items`
 
 **Examples of bad messages:**
 - `Update files` (too vague)
-- `Add exponential backoff to Jira API client to handle transient errors that were causing silent failures in the pipeline` (too long — save it for the PR)
+- `Add exponential backoff to REST API client to handle transient errors that were causing silent failures in the pipeline` (too long — save it for the PR)
 - `Added retry logic` (past tense)
 
 **Ticket reference:**
-- Extract ticket ID from branch name if present (e.g., `DATA-456-add-retry` -> `DATA-456`)
-- Prepend to message: `DATA-456: Add exponential backoff to Jira API client`
+- Extract ticket ID from branch name if present (e.g., `PROJ-456-add-retry` -> `PROJ-456`)
+- Prepend to message: `PROJ-456: Add exponential backoff to REST API client`
 
 ### Step 5: Present for Approval
 
@@ -104,7 +104,7 @@ Commit with this message? (yes / edit / cancel)
 - **Never stage with `git add -A` or `git add .`** — always stage specific files by name.
 - **Never stage `.env` files, credentials, or secrets.** If these appear in the diff, warn the user and exclude them.
 - **Use conversation context.** The biggest advantage you have over a diff-only tool is that you know WHY changes were made. Use it.
-- The user may pass arguments: `/commit just the tests` or `/commit only jira_client.py` — respect scope restrictions.
+- The user may pass arguments: `/commit just the tests` or `/commit only api_client.py` — respect scope restrictions.
 
 ## Arguments
 
