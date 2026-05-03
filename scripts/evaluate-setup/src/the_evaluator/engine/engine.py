@@ -12,10 +12,14 @@ from the_evaluator.engine.types import (
     Diagnostic,
     DiagnosticLocation,
     LintResult,
+    ParsedClaudeMd,
+    ParsedCommand,
+    ParsedHooks,
     ParsedSkill,
     ReportDescriptor,
     RuleContext,
     Severity,
+    TargetType,
 )
 
 _INTERPOLATION_RE = re.compile(r"\{\{(\w+)\}\}")
@@ -141,31 +145,156 @@ def _list_files(directory: Path) -> list[str]:
     )
 
 
-def lint(skill_path: str, config_rules: dict[str, str | list] | None = None) -> LintResult:
-    """Lint a single skill directory or SKILL.md file."""
-    skill = parse_skill(skill_path)
-    diagnostics: list[Diagnostic] = []
-    suppression_count = 0
+def parse_command(command_path: str) -> ParsedCommand:
+    """Parse a command directory or command.md file."""
+    path = Path(command_path)
+    parse_errors: list[str] = []
 
-    suppressions = parse_suppressions(skill.raw_content) if skill.raw_content else {}
-
-    for parse_error in skill.parse_errors:
-        diagnostics.append(
-            Diagnostic(
-                rule_id="parser",
-                severity=Severity.ERROR,
-                message=parse_error,
-                location=DiagnosticLocation(file=skill.skill_md_path),
-                category=skill.parse_errors[0] if skill.parse_errors else "structural",
+    if path.is_file() and path.name == "command.md":
+        cmd_dir = path.parent
+        cmd_md = path
+    elif path.is_dir():
+        cmd_md = path / "command.md"
+        cmd_dir = path
+        if not cmd_md.exists():
+            return ParsedCommand(
+                dir_path=str(path), dir_name=path.name, command_md_path=str(cmd_md),
+                raw_content="", frontmatter={}, body="", body_start_line=0,
+                script_references=[], files=_list_files(path),
+                parse_errors=["command.md not found"],
             )
+    else:
+        return ParsedCommand(
+            dir_path=str(path), dir_name=path.name, command_md_path=str(path),
+            raw_content="", frontmatter={}, body="", body_start_line=0,
+            script_references=[], files=[],
+            parse_errors=[f"Path does not exist: {path}"],
         )
 
-    rules = get_all_rules()
+    raw_content = cmd_md.read_text()
+    frontmatter: dict = {}
+    body = raw_content
+    body_start_line = 1
+
+    lines = raw_content.split("\n")
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                try:
+                    parsed = yaml.safe_load("\n".join(lines[1:i]))
+                    if isinstance(parsed, dict):
+                        frontmatter = parsed
+                except yaml.YAMLError as e:
+                    parse_errors.append(f"YAML parse error: {e}")
+                body = "\n".join(lines[i + 1:])
+                body_start_line = i + 2
+                break
+
+    script_refs = re.findall(r"[\w./-]+\.py\b", body)
+
+    return ParsedCommand(
+        dir_path=str(cmd_dir), dir_name=cmd_dir.name, command_md_path=str(cmd_md),
+        raw_content=raw_content, frontmatter=frontmatter, body=body,
+        body_start_line=body_start_line, script_references=script_refs,
+        files=_list_files(cmd_dir), parse_errors=parse_errors,
+        tokens=_count_tokens(raw_content),
+    )
+
+
+def parse_claude_md(file_path: str) -> ParsedClaudeMd:
+    """Parse a CLAUDE.md file."""
+    path = Path(file_path)
+    if not path.exists():
+        return ParsedClaudeMd(
+            file_path=file_path, raw_content="", line_count=0,
+            sections=[], parse_errors=[f"File not found: {file_path}"],
+        )
+
+    raw_content = path.read_text()
+    lines = raw_content.split("\n")
+
+    sections: list[dict[str, str]] = []
+    current_header = "(top)"
+    current_lines: list[str] = []
+
+    for line in lines:
+        if line.startswith("#"):
+            if current_lines:
+                sections.append({"header": current_header, "content": "\n".join(current_lines)})
+            current_header = line.lstrip("#").strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections.append({"header": current_header, "content": "\n".join(current_lines)})
+
+    return ParsedClaudeMd(
+        file_path=file_path, raw_content=raw_content, line_count=len(lines),
+        sections=sections, tokens=_count_tokens(raw_content),
+    )
+
+
+def parse_hooks(settings_path: str) -> ParsedHooks:
+    """Parse hooks from a .claude/settings.json file."""
+    import json as json_mod
+    path = Path(settings_path)
+    if not path.exists():
+        return ParsedHooks(
+            file_path=settings_path, hooks=[], raw_content="",
+            parse_errors=[f"File not found: {settings_path}"],
+        )
+
+    raw_content = path.read_text()
+    try:
+        data = json_mod.loads(raw_content)
+    except json_mod.JSONDecodeError as e:
+        return ParsedHooks(
+            file_path=settings_path, hooks=[], raw_content=raw_content,
+            parse_errors=[f"JSON parse error: {e}"],
+        )
+
+    hooks = []
+    hooks_data = data.get("hooks", {})
+    if isinstance(hooks_data, dict):
+        for event, hook_list in hooks_data.items():
+            if isinstance(hook_list, list):
+                for hook in hook_list:
+                    hooks.append({"event": event, **(hook if isinstance(hook, dict) else {"command": str(hook)})})
+
+    return ParsedHooks(
+        file_path=settings_path, hooks=hooks, raw_content=raw_content,
+    )
+
+
+def _run_rules(
+    target_type: TargetType,
+    file_path: str,
+    raw_content: str,
+    skill: ParsedSkill | None,
+    target: object | None,
+    config_rules: dict[str, str | list] | None,
+    all_skills: list[ParsedSkill] | None = None,
+) -> tuple[list[Diagnostic], int]:
+    """Run rules for a given target type. Returns (diagnostics, suppression_count)."""
+    diagnostics: list[Diagnostic] = []
+    suppression_count = 0
+    suppressions = parse_suppressions(raw_content) if raw_content else {}
     config_rules = config_rules or {}
 
-    for rule in rules:
-        severity_config = config_rules.get(rule.meta.id)
+    dummy_skill = skill or ParsedSkill(
+        dir_path="", dir_name="", skill_md_path=file_path, raw_content="",
+        frontmatter={}, raw_frontmatter="", frontmatter_start_line=0,
+        body="", body_start_line=0, files=[],
+    )
 
+    rules = get_all_rules()
+
+    for rule in rules:
+        if rule.meta.target_type != target_type:
+            continue
+
+        severity_config = config_rules.get(rule.meta.id)
         if severity_config == "off":
             continue
 
@@ -187,59 +316,149 @@ def lint(skill_path: str, config_rules: dict[str, str | list] | None = None) -> 
         except ValueError:
             severity = rule.meta.default_severity
 
-        def make_report(
-            rule_id: str,
-            sev: Severity,
-            meta_messages: dict[str, str],
-            category: str,
-            fixable: bool,
-            file_path: str,
-        ):
+        def make_report(rule_id, sev, meta_messages, category, fixable, fp):
             def report(descriptor: ReportDescriptor) -> None:
                 nonlocal suppression_count
-                loc = descriptor.location or DiagnosticLocation(file=file_path)
+                loc = descriptor.location or DiagnosticLocation(file=fp)
                 if is_suppressed(suppressions, rule_id, loc.start_line):
                     suppression_count += 1
                     return
-
                 template = meta_messages.get(descriptor.message_id, descriptor.message_id)
                 message = _interpolate(template, descriptor.data)
                 effective_severity = descriptor.severity_override or sev
-
-                diagnostics.append(
-                    Diagnostic(
-                        rule_id=rule_id,
-                        severity=effective_severity,
-                        message=message,
-                        location=loc,
-                        category=category,
-                        fix=descriptor.fix if fixable else None,
-                    )
-                )
-
+                diagnostics.append(Diagnostic(
+                    rule_id=rule_id, severity=effective_severity, message=message,
+                    location=loc, category=category, fix=descriptor.fix if fixable else None,
+                ))
             return report
 
         context = RuleContext(
-            skill=skill,
+            skill=dummy_skill,
             report=make_report(
-                rule.meta.id,
-                severity,
-                rule.meta.messages,
-                rule.meta.category,
-                rule.meta.fixable,
-                skill.skill_md_path,
+                rule.meta.id, severity, rule.meta.messages,
+                rule.meta.category, rule.meta.fixable, file_path,
             ),
             severity=severity,
             options=options,
+            target=target,
+            all_skills=all_skills or [],
         )
-
         rule.create(context)
 
+    return diagnostics, suppression_count
+
+
+def lint(skill_path: str, config_rules: dict[str, str | list] | None = None) -> LintResult:
+    """Lint a single skill directory or SKILL.md file."""
+    skill = parse_skill(skill_path)
+    diagnostics: list[Diagnostic] = []
+
+    for parse_error in skill.parse_errors:
+        diagnostics.append(Diagnostic(
+            rule_id="parser", severity=Severity.ERROR, message=parse_error,
+            location=DiagnosticLocation(file=skill.skill_md_path),
+            category=skill.parse_errors[0] if skill.parse_errors else "structural",
+        ))
+
+    rule_diags, suppression_count = _run_rules(
+        TargetType.SKILL, skill.skill_md_path, skill.raw_content,
+        skill=skill, target=skill, config_rules=config_rules,
+    )
+    diagnostics.extend(rule_diags)
+
     return LintResult(
-        skill_path=skill_path,
-        skill_name=skill.dir_name,
-        tokens=skill.tokens,
-        diagnostics=diagnostics,
+        skill_path=skill_path, skill_name=skill.dir_name, tokens=skill.tokens,
+        target_type="skill", diagnostics=diagnostics,
+        error_count=sum(1 for d in diagnostics if d.severity == Severity.ERROR),
+        warning_count=sum(1 for d in diagnostics if d.severity == Severity.WARNING),
+        info_count=sum(1 for d in diagnostics if d.severity == Severity.INFO),
+        fixable_count=sum(1 for d in diagnostics if d.fix is not None),
+        suppression_count=suppression_count,
+    )
+
+
+def lint_command(command_path: str, config_rules: dict[str, str | list] | None = None) -> LintResult:
+    """Lint a single command directory."""
+    cmd = parse_command(command_path)
+    diagnostics: list[Diagnostic] = []
+
+    for parse_error in cmd.parse_errors:
+        diagnostics.append(Diagnostic(
+            rule_id="parser", severity=Severity.ERROR, message=parse_error,
+            location=DiagnosticLocation(file=cmd.command_md_path), category="structural",
+        ))
+
+    rule_diags, suppression_count = _run_rules(
+        TargetType.COMMAND, cmd.command_md_path, cmd.raw_content,
+        skill=None, target=cmd, config_rules=config_rules,
+    )
+    diagnostics.extend(rule_diags)
+
+    return LintResult(
+        skill_path=command_path, skill_name=cmd.dir_name, tokens=cmd.tokens,
+        target_type="command", diagnostics=diagnostics,
+        error_count=sum(1 for d in diagnostics if d.severity == Severity.ERROR),
+        warning_count=sum(1 for d in diagnostics if d.severity == Severity.WARNING),
+        info_count=sum(1 for d in diagnostics if d.severity == Severity.INFO),
+        fixable_count=sum(1 for d in diagnostics if d.fix is not None),
+        suppression_count=suppression_count,
+    )
+
+
+def lint_claude_md(
+    file_path: str, config_rules: dict[str, str | list] | None = None,
+    all_skills: list[ParsedSkill] | None = None,
+) -> LintResult:
+    """Lint a CLAUDE.md file."""
+    claude_md = parse_claude_md(file_path)
+    diagnostics: list[Diagnostic] = []
+
+    for parse_error in claude_md.parse_errors:
+        diagnostics.append(Diagnostic(
+            rule_id="parser", severity=Severity.ERROR, message=parse_error,
+            location=DiagnosticLocation(file=file_path), category="structural",
+        ))
+
+    rule_diags, suppression_count = _run_rules(
+        TargetType.CLAUDE_MD, file_path, claude_md.raw_content,
+        skill=None, target=claude_md, config_rules=config_rules,
+        all_skills=all_skills,
+    )
+    diagnostics.extend(rule_diags)
+
+    return LintResult(
+        skill_path=file_path, skill_name=Path(file_path).name, tokens=claude_md.tokens,
+        target_type="claude_md", diagnostics=diagnostics,
+        error_count=sum(1 for d in diagnostics if d.severity == Severity.ERROR),
+        warning_count=sum(1 for d in diagnostics if d.severity == Severity.WARNING),
+        info_count=sum(1 for d in diagnostics if d.severity == Severity.INFO),
+        fixable_count=sum(1 for d in diagnostics if d.fix is not None),
+        suppression_count=suppression_count,
+    )
+
+
+def lint_hooks(
+    settings_path: str, config_rules: dict[str, str | list] | None = None,
+) -> LintResult:
+    """Lint hooks from settings.json."""
+    hooks = parse_hooks(settings_path)
+    diagnostics: list[Diagnostic] = []
+
+    for parse_error in hooks.parse_errors:
+        diagnostics.append(Diagnostic(
+            rule_id="parser", severity=Severity.ERROR, message=parse_error,
+            location=DiagnosticLocation(file=settings_path), category="structural",
+        ))
+
+    rule_diags, suppression_count = _run_rules(
+        TargetType.HOOKS, settings_path, hooks.raw_content,
+        skill=None, target=hooks, config_rules=config_rules,
+    )
+    diagnostics.extend(rule_diags)
+
+    return LintResult(
+        skill_path=settings_path, skill_name="hooks", tokens=0,
+        target_type="hooks", diagnostics=diagnostics,
         error_count=sum(1 for d in diagnostics if d.severity == Severity.ERROR),
         warning_count=sum(1 for d in diagnostics if d.severity == Severity.WARNING),
         info_count=sum(1 for d in diagnostics if d.severity == Severity.INFO),
