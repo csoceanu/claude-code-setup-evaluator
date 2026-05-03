@@ -1,9 +1,10 @@
 # the-evaluator
 
-**Status:** v1.1 scope defined · not yet built
+**Status:** v1.2 scope defined · built (Layers 1+2), Layer 3 needs API keys to test
 **Author:** project lead (Red Hat data scientist) + design review with Claude
-**Last updated:** April 2026
-**Changes from v1.0:** Rule engine architecture for Layer 1 (inspired by [skilleval](https://github.com/natifridman/skilleval)), config presets, inline suppression, auto-fix, structured rubric scoring for Layer 2 (inspired by [deepeval](https://github.com/confident-ai/deepeval)), red-team mode for preventive skills (inspired by [promptfoo](https://github.com/promptfoo/promptfoo) and [giskard](https://github.com/Giskard-AI/giskard)), repeat-and-vote judge reliability.
+**Last updated:** May 2026
+**Changes from v1.1:** Removed auto-fix (`--fix`). Added Layer 1 rules for commands (2 rules), CLAUDE.md (3 rules), and hooks (1 rule) — total 15 rules across 4 file types. Added interactive Step 0 (ask user about output format and scope before starting). Added cross-type optimization suggestions (skill→hook, skill→command, CLAUDE.md→skill, etc.). Added numbered suggestions in summary so users can say "do 1, skip 2". Added hard rules: never verdict without rubric, don't manufacture problems.
+**Changes from v1.0:** Rule engine architecture for Layer 1 (inspired by [skilleval](https://github.com/natifridman/skilleval)), config presets, inline suppression, structured rubric scoring for Layer 2 (inspired by [deepeval](https://github.com/confident-ai/deepeval)), red-team mode for preventive skills (inspired by [promptfoo](https://github.com/promptfoo/promptfoo) and [giskard](https://github.com/Giskard-AI/giskard)), repeat-and-vote judge reliability. Single-skill mode, CLAUDE.md evaluation rubric, command evaluation rubric.
 
 ---
 
@@ -13,7 +14,7 @@ the-evaluator evaluates your Claude Code setup — skills, commands, CLAUDE.md, 
 
 It works in three layers, each going deeper than the last:
 
-**Layer 1 — Count and check (rule engine, no AI).** A pluggable rule engine scans your skill files and runs mechanical checks. Each check is a self-contained rule — its own file, its own test, registered in a central registry. Out of the box, the engine ships with rules for token counting, near-duplicate detection, broken file references, format validation, missing descriptions, and security scanning (prompt injection, credential exposure). You can configure which rules run via presets (`recommended`, `strict`, `security`) or override individual rules in a `.evaluator.yaml` config file. No AI involved — just parsing and math. Outputs a JSON report with per-rule diagnostics.
+**Layer 1 — Count and check (rule engine, no AI).** A pluggable rule engine scans your setup files — skills, commands, CLAUDE.md, and hooks. Each check is a self-contained rule — its own file, its own test, registered in a central registry. Out of the box, the engine ships with 15 rules across 4 file types: skill rules (token counting, duplicate detection, broken references, format validation, missing descriptions, security scanning), command rules (description required, script existence), CLAUDE.md rules (line count, generic advice detection, skill duplication), and hooks rules (structure validation, dangerous patterns). You can configure which rules run via presets (`recommended`, `strict`, `security`) or override individual rules in a `.evaluator.yaml` config file. No AI involved — just parsing and math. Outputs a JSON report with per-rule diagnostics.
 
 **Layer 2 — Expert review (Claude in your session).** Claude — the one already running in your conversation — reads the Layer 1 JSON plus every skill and command file and CLAUDE.md, and evaluates the whole setup against structured rubrics. Skills are scored on 5 dimensions (specificity, redundancy, trigger quality, token efficiency, content quality). CLAUDE.md is scored on its own rubric (conciseness, signal-to-noise, skill separation, structure, conflict-free) based on [official Claude Code best practices](https://code.claude.com/docs/en/best-practices). Commands are scored on description quality, instruction clarity, script integrity, scope, and token efficiency. Each dimension gets a 1-5 rating and a one-sentence justification. Single-skill mode evaluates one skill in context of the full setup — detecting overlaps, conflicts, and redundancy with other skills and CLAUDE.md. Across the setup: should some skills be merged? Should any skill be a command instead (or vice versa)? Is the total context budget reasonable?
 
@@ -21,7 +22,7 @@ It works in three layers, each going deeper than the last:
 
 Layers 1 and 2 always run. Layer 3 is opt-in with `--deep` (standard A/B) or `--deep --red-team` (adversarial testing). Requires API keys from .env.
 
-The tool is read-only by default — it never modifies, moves, or deletes any of your files. The optional `--fix` flag auto-corrects trivial formatting issues (missing "Use when" prefix, frontmatter field fixes). Everything else is recommendations only.
+The tool is read-only — it never modifies, moves, or deletes any of your files. It produces numbered suggestions that the user can act on selectively ("do 1, do 2, skip 3").
 
 ---
 
@@ -86,7 +87,7 @@ Out-of-the-box rules check:
 - Is the formatting correct per the skill spec?
 - Does the skill contain prompt injection patterns or credential exposure?
 
-Users configure which rules run via presets (`recommended`, `strict`, `security`) or per-rule overrides in `.evaluator.yaml`. Skills can suppress specific rules with inline comments (`<!-- evaluator-ignore: rule-id -->`). Trivial issues (missing "Use when" prefix, formatting) can be auto-fixed with `--fix`.
+Users configure which rules run via presets (`recommended`, `strict`, `security`) or per-rule overrides in `.evaluator.yaml`. Skills can suppress specific rules with inline comments (`<!-- evaluator-ignore: rule-id -->`).
 
 This catches the obvious stuff — broken files, duplicates, missing fields, security issues. It outputs structured JSON with per-rule diagnostics that Layer 2 uses.
 
@@ -131,7 +132,7 @@ For users who want empirical proof, not just an expert opinion. This requires `A
 ### 3.2 How the layers flow together
 
 ```
-User types: /evaluate-setup [--preset X] [--fix] [--deep] [--deep --red-team]
+User types: /evaluate-setup [--preset X] [--all] [--deep] [--deep --red-team]
 
   +----------------------------------------------+
   |  Layer 1: Rule engine                        |
@@ -139,7 +140,7 @@ User types: /evaluate-setup [--preset X] [--fix] [--deep] [--deep --red-team]
   |  security) + .evaluator.yaml overrides       |
   |  Parse each skill → run enabled rules →      |
   |  collect diagnostics                         |
-  |  Optional: apply --fix for fixable issues    |
+  |  Scan skills, commands, CLAUDE.md, hooks      |
   +---------------------+------------------------+
                         | JSON output (per-rule diagnostics)
                         v
@@ -197,59 +198,53 @@ Layer 2 partially compensates — Claude can review the skill's description and 
 ### 4.1 The command
 
 ```
-/evaluate-setup [path] [--preset recommended|strict|security] [--fix] [--deep] [--deep --red-team]
+/evaluate-setup [path] [--preset recommended|strict|security] [--commands] [--claude-md] [--hooks] [--all] [--deep] [--deep --red-team]
 ```
 
-The user types `/evaluate-setup` inside Claude Code with optional arguments:
+Before running, the command asks the user two questions: (1) where to put the full review (terminal or file), and (2) what to evaluate (everything, skills only, or a specific item). The user's answers determine scope and output format.
 
 ```
 /evaluate-setup
-  Claude asks what to evaluate, or scans the default ~/.claude/ path.
-  Uses the "recommended" preset.
+  Asks what to evaluate, then runs.
 
 /evaluate-setup ~/.claude/skills/
-  Check all skills. Layers 1+2. Recommended preset.
+  Check all skills. Layers 1+2.
 
 /evaluate-setup ~/.claude/skills/python-error-handling/
   Single-skill mode. Scans ALL skills for context (duplicates, overlaps)
-  but focuses the report on this one skill. Layers 1+2.
+  but focuses the report on this one skill.
 
 /evaluate-setup ~/.claude/skills/ --preset strict
-  Check all skills with stricter rules (style, optimization, token efficiency).
+  Check all skills with stricter rules.
 
 /evaluate-setup ~/.claude/skills/ --preset security
-  Security-only audit (prompt injection, credential exposure, dangerous patterns).
+  Security-only audit.
 
-/evaluate-setup ~/.claude/skills/ --fix
-  Check all skills, then auto-fix trivial issues (missing "Use when" prefix,
-  formatting). Everything else is recommendations only.
-
-/evaluate-setup ~/.claude/ --deep
-  Full evaluation with A/B testing (standard mode).
-
-/evaluate-setup ~/.claude/skills/react-helper/ --deep
-  Deep eval on one suspicious skill.
-
-/evaluate-setup ~/.claude/ --deep --red-team
-  Full evaluation with adversarial testing for preventive skills.
-
-/evaluate-setup --claude-md
-  Evaluate CLAUDE.md files (project and user level) against best practices.
+/evaluate-setup --all
+  Evaluate everything: skills + commands + CLAUDE.md + hooks.
 
 /evaluate-setup --commands
   Evaluate all command.md files.
 
-/evaluate-setup --all
-  Evaluate everything: skills + CLAUDE.md + commands.
+/evaluate-setup --claude-md
+  Evaluate CLAUDE.md files against best practices.
+
+/evaluate-setup --hooks
+  Evaluate hooks in .claude/settings.json.
+
+/evaluate-setup ~/.claude/ --deep
+  Full evaluation with A/B testing (standard mode).
+
+/evaluate-setup ~/.claude/ --deep --red-team
+  Full evaluation with adversarial testing for preventive skills.
 ```
 
-Natural language works too. The command prompt tells Claude to handle things like:
+Natural language works too:
 - "evaluate my setup" (same as `--all`)
 - "is my python-error-handling skill any good?" (single-skill mode)
 - "which of my skills should I remove?"
 - "run the deep test on react-helper"
 - "run a security audit on my skills"
-- "fix the formatting issues in my skills"
 - "red-team my security skills"
 - "evaluate my CLAUDE.md"
 - "are my commands well-structured?"
@@ -283,7 +278,6 @@ Analyzing setup at ~/.claude/skills/ ...
   1 duplicate pair detected
   3 skills missing descriptions
   1 broken file reference
-  2 fixable with --fix
 
 ## Per-Skill Review (Layer 2)
 
@@ -341,24 +335,26 @@ Analyzing setup at ~/.claude/skills/ ...
   ! Should be split into 3-4 focused skills (react, css, testing, deployment)
   x Trigger condition too broad: "when working with frontend"
 
-## Setup-Wide Recommendations
-  - Merge pdf-wizard + pdf-creator into one skill (91% overlap)
-  - Convert "deploy-checklist" from skill to command (user-triggered workflow)
-  - CLAUDE.md duplicates 3 rules from python-conventions skill — remove from CLAUDE.md
+## Evaluation Summary
 
-## Summary
-  Keep:    5 skills (total: 14,200 tokens)
-  Remove:  6 skills (total: 18,400 tokens)  <- potential savings
-  Review:  3 skills
-  Fixable: 2 issues (run with --fix to auto-correct)
+Found 6 skills that need attention out of 14 reviewed.
+Total context budget: 34,200 tokens (17%).
 
-  3 skills scored 2 stars or below. Want me to run deep evaluation on those?
-  Requires ANTHROPIC_API_KEY and GEMINI_API_KEY in your .env.
+Suggestions (say "do 1", "do 2", "skip 3" to act on them):
+  1. Remove "be-helpful" skill — 100% redundant with Claude's default behavior
+  2. Remove "pdf-creator" — 91% duplicate of pdf-wizard
+  3. Merge pdf-wizard + pdf-creator into one skill if both have unique parts
+  4. Split react-helper into 3-4 focused skills (react, css, testing, deployment)
+  5. Convert "deploy-checklist" from skill to command (user-triggered workflow)
+  6. Remove duplicated testing rules from CLAUDE.md (already in python-conventions skill)
+
+Full review: saved to evaluate-setup-report.md
 ```
 
 ### 4.4 Safety
 
-- **Read-only by default.** The tool never modifies, moves, or deletes any files unless you explicitly pass `--fix`. Even then, `--fix` only corrects trivial formatting issues (missing "Use when" prefix, frontmatter field fixes). It never rewrites instructions, deletes skills, or changes content.
+- **Read-only.** The tool never modifies, moves, or deletes any files. It produces numbered suggestions — the user decides which to act on by saying "do 1, do 2, skip 3".
+- **Interactive.** Before running, the tool asks what to evaluate and where to put the output. No surprises.
 - **Confirmation.** Deep evaluation asks for confirmation before making any API calls. The tool shows the estimated number of calls and approximate cost before proceeding.
 - **Privacy.** No data leaves your machine except API calls to Anthropic and Google (Layer 3 only). Layers 1+2 are completely local.
 
@@ -372,65 +368,66 @@ Analyzing setup at ~/.claude/skills/ ...
 the-evaluator/
   commands/
     evaluate-setup/
-      prompt.md                    # Layer 2: command prompt with rubric
+      command.md                   # Layer 2: command prompt with rubrics + cross-type optimization
   scripts/
-    static_analyze.py              # Layer 1: CLI entry point
-    deep_eval.py                   # Layer 3: A/B + red-team evaluation
-    engine/                        # Rule engine core
-      __init__.py
-      types.py                     # Dataclasses: RuleMeta, RuleContext, Diagnostic, etc.
-      registry.py                  # Rule registry (register, get_all, get_by_category)
-      engine.py                    # Lint loop: parse -> config -> run rules -> collect
-      fixer.py                     # Auto-fix: apply fixable diagnostics to source files
-      suppression.py               # Inline suppression comment parser
-    rules/                         # Rule implementations (one file per rule)
-      __init__.py                  # register_all_rules()
-      structural/
-        __init__.py
-        skill_md_exists.py         # Does SKILL.md exist in the directory?
-      frontmatter/
-        __init__.py
-        description_required.py    # Is the description field present and non-empty?
-        trigger_quality.py         # Does description start with "Use when"? (fixable)
-        format_valid.py            # Is frontmatter structure valid per skill spec? (fixable)
-      content/
-        __init__.py
-        token_budget.py            # Is the skill under 1,500 tokens?
-        broken_references.py       # Do referenced files actually exist?
-        duplicate_detection.py     # Is this skill a near-copy of another?
-      security/
-        __init__.py
-        no_prompt_injection.py     # Does the skill contain injection patterns?
-        no_credential_access.py    # Does the skill reference sensitive paths/env vars?
-      best_practices/
-        __init__.py
-    config/                        # Configuration system
-      __init__.py
-      types.py                     # EvaluatorConfig, ResolvedConfig dataclasses
-      loader.py                    # Load .evaluator.yaml or --preset flag
-      presets/
-        __init__.py
-        recommended.py             # Default: catches real problems
-        strict.py                  # Recommended + style/optimization
-        security.py                # Security rules only
-  .evaluator.yaml.example         # Example config file
+    evaluate-setup/
+      pyproject.toml               # Package config + dependencies
+      src/the_evaluator/
+        cli.py                     # CLI entry point (scan subcommand with --all/--commands/--claude-md/--hooks)
+        deep_eval.py               # Layer 3: A/B + red-team evaluation
+        engine/                    # Rule engine core
+          types.py                 # Dataclasses + TargetType enum (skill/command/claude_md/hooks)
+          registry.py              # Rule registry (register, get_all, get_by_category)
+          engine.py                # Parsers + lint functions for all 4 file types
+          suppression.py           # Inline suppression comment parser
+        rules/                     # Rule implementations (one file per rule)
+          __init__.py              # register_all_rules() — registers all 15 rules
+          structural/
+            skill_md_exists.py     # Does SKILL.md exist in the directory?
+          frontmatter/
+            description_required.py # Is the description field present and non-empty?
+            trigger_quality.py     # Does description start with "Use when"?
+            format_valid.py        # Is frontmatter structure valid per skill spec?
+          content/
+            token_budget.py        # Is the skill under 1,500 tokens?
+            broken_references.py   # Do referenced files actually exist?
+            duplicate_detection.py # Is this skill a near-copy of another?
+          security/
+            no_prompt_injection.py # Does the skill contain injection patterns?
+            no_credential_access.py # Does the skill reference sensitive paths/env vars?
+          commands/                # Command-specific rules
+            description_required.py # Does the command have a description?
+            script_exists.py       # Do referenced scripts exist?
+          claude_md/               # CLAUDE.md-specific rules
+            line_count.py          # Is CLAUDE.md under 300 lines?
+            generic_advice.py      # Does it contain advice Claude already follows?
+            skill_duplication.py   # Does it duplicate content from skills?
+          hooks/                   # Hooks-specific rules
+            valid_structure.py     # Valid structure, dangerous patterns, script existence
+        config/                    # Configuration system
+          types.py                 # EvaluatorConfig, ResolvedConfig dataclasses
+          loader.py                # Load .evaluator.yaml or --preset flag
+          presets/
+            recommended.py         # Default: catches real problems
+            strict.py              # Recommended + style/optimization
+            security.py            # Security rules only
 ```
 
 `prompt.md` is the brain — it tells Claude what to do, what rubric to evaluate against, and how to format the output. The rule engine and Python scripts are the hands — they do the mechanical work that Claude can't or shouldn't do itself.
 
-### 5.2 Layer 1 details: `static_analyze.py` + rule engine
+### 5.2 Layer 1 details: rule engine
 
-Pure Python. No LLM calls. Uses PEP 723 inline dependencies so `uv run static_analyze.py` just works — no install step.
+Python package (`scripts/evaluate-setup/`). No LLM calls. Run via `uv run --project scripts/evaluate-setup evaluate-setup scan`.
 
-**Input:** A path. Can be a single skill file, a skill directory, a folder of skills, or `~/.claude/`.
+**Input:** A path + flags for which file types to scan.
 
 **CLI:**
 
 ```bash
-uv run static_analyze.py <path> [--preset recommended|strict|security] [--config .evaluator.yaml] [--fix]
+uv run --project scripts/evaluate-setup evaluate-setup scan <path> [--preset recommended|strict|security] [--commands] [--claude-md] [--hooks] [--all] [--target <skill-name>]
 ```
 
-**Output:** JSON to stdout with per-rule diagnostics. Human-readable summary to stderr.
+**Output:** JSON to stdout with per-rule diagnostics for all scanned file types. Human-readable summary to stderr.
 
 #### 5.2.1 Rule engine architecture
 
@@ -659,19 +656,42 @@ class TriggerQuality:
 
 The security rule checks for known prompt injection patterns (e.g., "ignore previous instructions", "disregard all prior", "you are now", "system prompt override"). It uses context-aware severity — patterns found inside code fences or quoted examples are downgraded from error to warning, since they're likely documentation rather than actual injection attempts. This pattern is borrowed directly from skilleval's `no-prompt-injection` rule.
 
-**Initial rules shipped with v1:**
+**Rules shipped with v1.2 (15 rules across 4 file types):**
 
-| Rule ID | Category | Default | Fixable | What it checks |
-|---|---|---|---|---|
-| `structural/skill-md-exists` | structural | error | no | SKILL.md file exists in directory |
-| `frontmatter/description-required` | frontmatter | error | no | Description field present and non-empty |
-| `frontmatter/trigger-quality` | frontmatter | warning | yes | Description starts with "Use when" |
-| `frontmatter/format-valid` | frontmatter | warning | yes | Frontmatter structure valid per spec |
-| `content/token-budget` | content | warning | no | Skill under 1,500 tokens |
-| `content/broken-references` | content | error | no | Referenced files actually exist |
-| `content/duplicate-detection` | content | warning | no | No near-duplicate skills (>0.85 similarity) |
-| `security/no-prompt-injection` | security | error | no | No injection patterns in skill content |
-| `security/no-credential-access` | security | error | no | No references to sensitive paths/env vars |
+**Skill rules (9):**
+
+| Rule ID | Category | Default | What it checks |
+|---|---|---|---|
+| `structural/skill-md-exists` | structural | error | SKILL.md file exists in directory |
+| `frontmatter/description-required` | frontmatter | error | Description field present and non-empty |
+| `frontmatter/trigger-quality` | frontmatter | warning | Description starts with "Use when" |
+| `frontmatter/format-valid` | frontmatter | warning | Frontmatter structure valid, name matches directory |
+| `content/token-budget` | content | warning | Skill under 1,500 tokens |
+| `content/broken-references` | content | error | Referenced files actually exist |
+| `content/duplicate-detection` | content | warning | No near-duplicate skills (>0.85 similarity) |
+| `security/no-prompt-injection` | security | error | No injection patterns (context-aware: downgrades in code blocks) |
+| `security/no-credential-access` | security | error | No references to sensitive paths/env vars |
+
+**Command rules (2):**
+
+| Rule ID | Category | Default | What it checks |
+|---|---|---|---|
+| `command/description-required` | frontmatter | error | Description present and not too vague (>2 words) |
+| `command/script-exists` | content | warning | Referenced .py scripts exist in command directory |
+
+**CLAUDE.md rules (3):**
+
+| Rule ID | Category | Default | What it checks |
+|---|---|---|---|
+| `claude-md/line-count` | content | warning | Under 300 lines |
+| `claude-md/generic-advice` | content | info | No generic phrases Claude already follows ("write clean code", "be helpful", etc.) |
+| `claude-md/skill-duplication` | content | warning | No sections duplicating content from skills (>40% word overlap) |
+
+**Hooks rules (1):**
+
+| Rule ID | Category | Default | What it checks |
+|---|---|---|---|
+| `hooks/valid-structure` | security | warning | Commands defined, no dangerous patterns (rm -rf, force push), scripts exist |
 
 #### 5.2.2 Config presets
 
@@ -741,9 +761,9 @@ ignore:
 3. If `--preset` CLI flag is passed, it overrides the file's `extends`
 4. Result: `ResolvedConfig` with per-rule severity map + ignore patterns
 
-#### 5.2.3 Inline suppression and auto-fix
+#### 5.2.3 Inline suppression
 
-**Inline suppression** — users can mark intentional exceptions in skill files:
+Users can mark intentional exceptions in skill files:
 
 ```markdown
 <!-- evaluator-ignore: content/token-budget -->
@@ -760,15 +780,6 @@ Two forms:
 Multiple rules can be comma-separated: `<!-- evaluator-ignore: rule-a, rule-b -->`.
 
 The engine parses these before running rules. Suppressed diagnostics are silently dropped in the `report()` callback — rules never know about suppressions. Suppression counts are tracked in `LintResult.suppression_count` for transparency.
-
-**Auto-fix** — the `--fix` flag applies trivial corrections:
-
-1. After all rules run, collect diagnostics where `fix is not None`
-2. Group by file path
-3. For each file, read content, apply fixes in reverse line order (to preserve line numbers), write back
-4. Report what was fixed to stderr
-
-Only mechanical fixes are auto-applied — formatting, missing prefixes, field normalization. Content rewrites, duplicate resolution, and security issues always require human judgment.
 
 **Output:** JSON to stdout. Example:
 
@@ -1255,45 +1266,49 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 
 The prompt instructs Claude to orchestrate the layers:
 
-1. **Always** run `static_analyze.py` with the specified preset and read the JSON (Layer 1). If `--fix` was passed, report what was auto-fixed.
-2. **Always** read the actual skill files and evaluate them against the rubric (Layer 2). Score each skill on 5 dimensions with reasoning. Produce setup-wide recommendations.
-3. Produce the report with rubric scores, star ratings, verdicts, and recommendations.
+0. **Before anything:** Ask the user where to put the output (terminal or file) and what to evaluate (everything, skills only, specific item). Wait for answers.
+1. **Always** run the rule engine with the specified preset and flags (Layer 1). Read the JSON.
+2. **Always** read the actual files and evaluate them against the appropriate rubric (Layer 2). Score each item on its rubric dimensions with reasoning. Run cross-type optimization analysis.
+3. Produce the full review (to terminal or file based on user's choice).
 4. **After** the report:
    - If the user passed `--deep`: check for API keys in environment, show estimated cost (46 calls x number of skills), ask for confirmation, then run `deep_eval.py` in standard mode.
    - If the user passed `--deep --red-team`: same confirmation flow, but run adversarial mode for preventive skills and standard mode for the rest.
    - If the user did NOT pass `--deep` but some skills scored 2 stars or below: suggest running deep eval on just those few skills (targeted).
-5. If Layer 3 ran, incorporate the results into the final report — each skill's verdict card gets:
-   - A/B results: win/loss/tie counts with confidence levels (HIGH/LOW)
-   - Red-team results (if applicable): held/broke/partial counts with overall verdict (STRONG/WEAK/FRAGILE)
-   - Whether the empirical evidence confirms or contradicts the Layer 2 rubric assessment
+5. If Layer 3 ran, incorporate the results into the full review.
+6. **Always** print a short terminal summary with numbered suggestions. The user can say "do 1, do 2, skip 3" to act on them. If the setup is solid, say so — don't manufacture problems.
 
 ---
 
 ## 6. Scope
 
-### 6.1 What v1 includes
+### 6.1 What v1.2 includes
 
-- Evaluating Claude Code **skills**, **commands**, and **CLAUDE.md** files
+- Evaluating Claude Code **skills**, **commands**, **CLAUDE.md**, and **hooks**
 - **Scope modes:**
-  - Full setup scan (`--all` or no flag): evaluate all skills + CLAUDE.md + commands
+  - Full setup scan (`--all`): evaluate all skills + CLAUDE.md + commands + hooks
   - Skills only: evaluate all skills in a directory
-  - Single-skill mode: evaluate one skill in context of the full setup (loads all skills + CLAUDE.md + commands for overlap/conflict detection, focuses report on the target)
+  - Single-skill mode (`--target`): evaluate one skill in context of the full setup
   - CLAUDE.md only (`--claude-md`): evaluate CLAUDE.md against best practices
   - Commands only (`--commands`): evaluate all command.md files
-- **Layer 1:** pluggable rule engine with 9 initial rules across 5 categories (structural, frontmatter, content, security, best practices)
-- **Layer 1 extras:** config presets (recommended/strict/security), `.evaluator.yaml` per-rule overrides, inline suppression comments, auto-fix for trivial issues (`--fix`)
-- **Layer 2 skills rubric:** 5 dimensions (specificity, redundancy, trigger quality, token efficiency, content quality), 1-5 scoring with anchors, weighted average for star rating, one-sentence reasoning per dimension
-- **Layer 2 CLAUDE.md rubric:** 5 dimensions (conciseness, signal-to-noise, skill separation, structure, conflict-free), based on official Claude Code best practices
+  - Hooks only (`--hooks`): evaluate hooks in settings.json
+- **Interactive Step 0:** asks user about output format (terminal/file) and scope before starting
+- **Layer 1:** pluggable rule engine with 15 rules across 4 file types (skills, commands, CLAUDE.md, hooks)
+- **Layer 1 extras:** config presets (recommended/strict/security), `.evaluator.yaml` per-rule overrides, inline suppression comments
+- **Layer 2 skills rubric:** 5 dimensions (specificity, redundancy, trigger quality, token efficiency, content quality)
+- **Layer 2 CLAUDE.md rubric:** 5 dimensions (conciseness, signal-to-noise, skill separation, structure, conflict-free)
 - **Layer 2 commands rubric:** 5 dimensions (description quality, instruction clarity, script integrity, scope appropriateness, token efficiency)
-- **Layer 2 setup-wide recommendations:** merge candidates, skill/command conversion, overlapping triggers, coverage gaps, total context budget
-- **Layer 3 standard (optional):** A/B evaluation with Gemini-generated tasks, Claude API execution, Gemini blind judging with repeat-and-vote (3 votes per pair, majority wins, confidence levels)
-- **Layer 3 red-team (optional):** adversarial testing for preventive skills — Gemini generates attack tasks, judges whether skill held/broke/partial
-- Read-only by default — `--fix` is opt-in and only corrects formatting
+- **Layer 2 hooks evaluation:** structure validation, dangerous pattern detection, script existence
+- **Layer 2 cross-type optimization:** suggests transformations between types (skill→hook, skill→command, CLAUDE.md→skill, etc.) when genuinely beneficial
+- **Layer 2 setup-wide recommendations:** merge candidates, overlapping triggers, coverage gaps, total context budget
+- **Numbered suggestions:** final summary with numbered items so users can say "do 1, skip 2"
+- **Layer 3 standard (optional):** A/B evaluation with repeat-and-vote (3 votes per pair)
+- **Layer 3 red-team (optional):** adversarial testing for preventive skills
+- Read-only — never modifies files
 - Cost controls — estimates before API calls, user confirms
 
-### 6.2 What v1 does NOT include
+### 6.2 What v1.2 does NOT include
 
-- Evaluating hooks or MCP servers (skills, commands, and CLAUDE.md only — other types are a v1.5 feature)
+- Evaluating MCP servers (hooks are covered, MCP is a v1.5 feature)
 - Running real Claude Code in subprocess mode (v1 uses the Claude API directly — see section 3.3 for why this matters)
 - Executable-test scoring (actually running generated code to check correctness)
 - Mining chat history for real tasks to test against
@@ -1319,7 +1334,7 @@ The prompt instructs Claude to orchestrate the layers:
 
 ## 7. Future versions
 
-**v1.5 — more scope:** Evaluate hooks and MCP server configurations. CI/CD integration — run Layer 1 automatically on PRs that modify skills, post results as PR comments, block merge on errors. SQLite caching so you can track whether a skill's verdict changes over time ("this skill used to help, but since Claude 4.7 it's redundant"). Better duplicate detection using Gemini's embedding API. User-configurable rubric weights.
+**v1.5 — more scope:** Evaluate MCP server configurations. CI/CD integration — run Layer 1 automatically on PRs that modify skills, post results as PR comments, block merge on errors. SQLite caching so you can track whether a skill's verdict changes over time ("this skill used to help, but since Claude 4.7 it's redundant"). Better duplicate detection using Gemini's embedding API. User-configurable rubric weights.
 
 **v2 — more fidelity:** Real Claude Code subprocess mode — spawn `claude` in headless mode with controlled skill directories to test actual activation behavior. Chat history mining as an optional source of real tasks to test against. Multi-model judge ensemble for more reliable verdicts.
 
@@ -1359,8 +1374,8 @@ v1 is successful if:
 4. Layer 3 deep eval on 5 skills completes successfully with repeat-and-vote producing **>70% HIGH confidence pairs**.
 5. A user who knows nothing about skill best practices can **read the report and decide what to do** without needing to look anything up.
 6. The rubric produces **consistent scores** — running the same evaluation twice on the same setup produces star ratings within ±1 star for each skill.
-7. `--fix` successfully auto-corrects at least **2 common formatting issues** without breaking any skill files.
-8. Red-team mode correctly identifies at least **1 weakness** in a preventive skill that the standard A/B test would miss.
+7. Red-team mode correctly identifies at least **1 weakness** in a preventive skill that the standard A/B test would miss.
+8. Numbered suggestions in the summary are actionable — the user can say "do 1" and Claude executes it correctly.
 
 ---
 
