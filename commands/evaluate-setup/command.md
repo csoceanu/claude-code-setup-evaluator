@@ -98,6 +98,8 @@ Things Claude already does by default (always redundant):
 
 A skill is NOT redundant if it provides specific, actionable rules. "Always use `raise from` for exception chaining in Python" is specific enough to change behavior.
 
+**Also check for overlap with Claude's built-in behavior.** Claude already does many things by default (plan mode, code review, commit messages, code explanation). A skill that just wraps a Claude default without adding specific rules or constraints is redundant. Ask: "if I deleted this skill, would Claude behave differently?" If not → redundant.
+
 **Trigger quality (weight 0.20)**
 - 1: No description, or description triggers on everything
 - 2: Description exists but is too broad or too narrow
@@ -158,15 +160,17 @@ Score CLAUDE.md on 5 dimensions:
 
 ## Step 3c: Evaluate Commands (if --commands or --all)
 
-Score each command on 5 dimensions:
+Score each command on 7 dimensions:
 
 | Dimension | Weight | What to check |
 |---|---|---|
-| **Description quality** | 0.25 | Clear, concise description for the UI menu? |
-| **Instruction clarity** | 0.25 | Claude knows exactly what to do, in what order? |
-| **Script integrity** | 0.20 | Referenced scripts exist? Discovery pattern works? |
-| **Scope appropriateness** | 0.15 | Should this be a command (user-triggered) or a skill (auto-triggered)? |
-| **Token efficiency** | 0.15 | Concise or bloated? |
+| **Description quality** | 0.20 | Clear, concise description for the UI menu? |
+| **Instruction clarity** | 0.20 | Claude knows exactly what to do, in what order? |
+| **Script integrity** | 0.15 | Referenced scripts exist? Discovery pattern works? |
+| **Scope appropriateness** | 0.10 | Should this be a command (user-triggered) or a skill (auto-triggered)? |
+| **Token efficiency** | 0.10 | Concise or bloated? |
+| **Redundancy with defaults** | 0.15 | Does Claude already do this without the command? Claude has built-in plan mode, generates commit messages, explains code, and reviews code by default. A command is only justified if it adds specific rules, constraints, or structure that Claude wouldn't follow unprompted. Ask: "if I deleted this command, could I get the same result by just asking Claude?" If yes → redundant. |
+| **Robustness** | 0.10 | Does the command handle edge cases? Does it hardcode assumptions (specific tools, languages, thresholds) that should be detected from the project? Does it depend on skills loading reliably? Does it gracefully handle missing dependencies? |
 
 ## Step 3d: Evaluate Hooks (if --hooks or --all)
 
