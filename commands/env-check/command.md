@@ -10,12 +10,33 @@ This command validates the entire local setup in one pass.
 
 ## Instructions
 
+### 0. Detect Project Type
+
+Before running any checks, detect what kind of project this is:
+
+```bash
+# Check for project markers
+ls pyproject.toml setup.cfg setup.py requirements.txt .python-version 2>/dev/null  # Python
+ls package.json 2>/dev/null  # Node.js
+ls go.mod 2>/dev/null  # Go
+ls Cargo.toml 2>/dev/null  # Rust
+ls pom.xml build.gradle 2>/dev/null  # Java
+```
+
+If no project markers are found, ask the user: "couldn't detect the project type — what stack is this?"
+
+Run only the checks relevant to the detected stack. The sections below use Python as the example, but adapt to the detected stack (e.g., `node_modules` for Node, `go mod tidy` for Go).
+
 Check this project's development environment is properly configured:
 
 ### 1. Runtime Version
 
-- Look for configuration files that specify requirements: `pyproject.toml`, `.python-version`, `setup.cfg`, `runtime.txt`
-- Check the installed Python version matches the project's requirement
+- Look for configuration files that specify the required runtime version for the detected stack
+- For Python: `pyproject.toml`, `.python-version`, `setup.cfg`, `runtime.txt`
+- For Node: `package.json` engines field, `.nvmrc`, `.node-version`
+- For Go: `go.mod` go directive
+- For Rust: `rust-toolchain.toml`
+- Check the installed version matches the project's requirement
 - Report: version required vs version found
 
 ### 2. Package Dependencies
