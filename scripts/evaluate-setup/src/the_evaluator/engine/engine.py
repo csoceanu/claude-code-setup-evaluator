@@ -481,9 +481,11 @@ def lint_directory(
     if not path.is_dir():
         return results
 
+    excluded = {".git", ".venv", "node_modules", "repositories", "__pycache__", "tests"}
     skill_dirs: list[Path] = []
     for p in sorted(path.rglob("SKILL.md")):
-        if ".git" not in p.parts:
+        relative_parts = p.relative_to(path).parts
+        if excluded.isdisjoint(relative_parts):
             skill_dirs.append(p.parent)
 
     if not skill_dirs and (path / "SKILL.md").exists():
