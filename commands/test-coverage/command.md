@@ -8,18 +8,35 @@ Analyze test coverage, identify gaps, and generate missing tests.
 
 ## Instructions
 
+### Step 0: Detect Test Runner and Coverage Target
+
+Before running anything, detect the project's test runner and coverage target from config:
+
+```bash
+# Check for test runner config
+cat pyproject.toml 2>/dev/null | grep -A5 'tool.pytest\|tool.coverage\|tool.unittest'
+cat setup.cfg 2>/dev/null | grep -A5 'tool:pytest\|coverage'
+cat pytest.ini 2>/dev/null
+cat package.json 2>/dev/null | grep -E '"test"|"jest"|"mocha"|"vitest"'
+```
+
+- **Test runner:** use whatever the project configures (pytest, unittest, jest, vitest, etc.). Fall back to pytest only if nothing is configured and `pyproject.toml` exists.
+- **Coverage target:** read from `pyproject.toml` (`[tool.coverage.report]` → `fail_under`), `setup.cfg`, or `.coveragerc`. Fall back to 80% only if no target is configured.
+
+If no test runner is detected, ask the user: "couldn't detect the test runner — what does this project use?"
+
 ### Step 1: Run Coverage
+
+Use the detected test runner. For pytest:
 
 ```bash
 pytest --cov --cov-report=term-missing -q
 ```
 
-If pytest is not configured, check for `pyproject.toml`, `setup.cfg`, or `pytest.ini` for test configuration.
-
 ### Step 2: Analyze Coverage Report
 
 1. Parse the coverage output
-2. List files **below 80% coverage**, sorted worst-first
+2. List files **below the coverage target**, sorted worst-first
 3. For each under-covered file, identify:
    - Untested functions or methods
    - Missing branch coverage (if/else, try/except, early returns)
