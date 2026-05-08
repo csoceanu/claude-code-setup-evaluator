@@ -152,11 +152,17 @@ A skill is NOT redundant if it provides specific, actionable rules. "Always use 
 **Also check for overlap with Claude's built-in behavior.** Claude already does many things by default (plan mode, code review, commit messages, code explanation). A skill that just wraps a Claude default without adding specific rules or constraints is redundant. Ask: "if I deleted this skill, would Claude behave differently?" If not → redundant.
 
 **Trigger quality (weight 0.20)**
-- 1: No description, or description triggers on everything
-- 2: Description exists but is too broad or too narrow
+- 1: No description, or description triggers on everything, or uses coercive language with broad scope
+- 2: Description exists but is too broad, too narrow, or uses coercive language with narrow scope
 - 3: Description is reasonable but could be more precise
 - 4: Good description that targets the right tasks most of the time
 - 5: Description precisely targets the right tasks; starts with "Use when"; doesn't overlap with other skills
+
+**Autonomy impact (scored within Trigger quality):** Skills should guide, not mandate. Check for these patterns:
+- **Coercive language in description:** "MUST use this", "ALWAYS use this before", "NEVER skip" — these override the user's choice of when to activate the skill. A skill description should describe *when it's relevant*, not *demand* it runs. Cap trigger quality at 2/5 if the description mandates activation.
+- **Hard gates in skill body:** `<HARD-GATE>`, "Do NOT proceed until", "STOP and do X first" — these block the user's workflow unless the skill's precondition is met. Hard gates are appropriate for narrow safety concerns (e.g., "don't commit secrets") but not for broad creative workflows.
+- **Broad category intercept:** "any creative work", "all code changes", "every project", "whenever you write code" — skills that claim authority over entire categories of work will trigger too often and erode user trust. A good skill targets a specific task type, not a category of all human activity.
+- **The test:** Ask "could a reasonable user want to skip this skill and go straight to coding?" If yes, the trigger language shouldn't prevent that.
 
 **Token efficiency (weight 0.15)**
 - 1: >3,000 tokens with low value density
@@ -226,9 +232,15 @@ Score each command on 7 dimensions:
 | **Instruction clarity** | 0.20 | Claude knows exactly what to do, in what order? |
 | **Script integrity** | 0.15 | Referenced scripts exist? Discovery pattern works? |
 | **Scope appropriateness** | 0.10 | Should this be a command (user-triggered) or a skill (auto-triggered)? |
-| **Token efficiency** | 0.10 | Concise or bloated? |
+| **Token efficiency** | 0.10 | Concise or bloated? See command size thresholds below. |
 | **Redundancy with defaults** | 0.15 | Does Claude already do this without the command? Claude has built-in plan mode, generates commit messages, explains code, and reviews code by default. A command is only justified if it adds specific rules, constraints, or structure that Claude wouldn't follow unprompted. Ask: "if I deleted this command, could I get the same result by just asking Claude?" If yes → redundant. |
 | **Robustness** | 0.10 | Does the command handle edge cases? Does it hardcode assumptions (specific tools, languages, thresholds) that should be detected from the project? Does it depend on skills loading reliably? Does it gracefully handle missing dependencies? |
+
+**Command size thresholds (scored within Token efficiency):** Commands use the same progressive disclosure principle as skills. A monolithic command.md loads its entire content when invoked — the larger it is, the more context it burns.
+- Under 15KB: Fine. Most commands are 1-5KB.
+- 15-30KB: Recommend splitting into a thin command.md (execution steps, rubric) + reference files that Claude reads on demand. Score token efficiency at most 2/5.
+- Over 30KB: Strong recommendation to split. The command is doing too much in one file. Score token efficiency at most 1/5.
+- A command.md that references separate files for optional/conditional sections (e.g., Layer 3 protocol loaded only when the user selects it) is more efficient than one that inlines everything.
 
 ## Step 3d: Evaluate Hooks (if --hooks or --all)
 
@@ -334,6 +346,14 @@ This is where you look at the **whole setup** and suggest transformations betwee
 - **Total context budget**: Sum all skills + CLAUDE.md + commands tokens, warn if >20% of context window
 - **Redundancy across types**: Same instruction appearing in CLAUDE.md AND a skill (double token cost)
 - **Conflicts across types**: CLAUDE.md says one thing, a skill says the opposite
+
+### Behavioral pattern checks (setup-wide):
+
+These checks look at patterns across the whole setup, not individual items:
+
+- **Mandate stacking**: Count skills that use coercive language (MUST, ALWAYS, NEVER) in descriptions or hard gates in body. If >2 skills mandate pre-conditions, they create conflicting demands — Claude can't MUST do everything before every task. Flag: "N skills use mandatory language — this creates competing mandates that erode reliability. Consider making most of them advisory ('Use when...') and keeping hard mandates only for genuine safety constraints."
+- **Autonomy erosion**: If the setup has skills that intercept broad work categories (e.g., "any creative work", "all code changes") AND those skills contain hard gates, the user loses control of their workflow. Flag when broad-trigger + hard-gate skills exist: "This skill claims authority over [broad category] and blocks progress until its precondition is met. This fights user autonomy — consider narrowing the trigger or removing the hard gate."
+- **Broad trigger collision**: Multiple skills with overlapping broad triggers (e.g., two skills both triggering on "Python files" or "code changes") waste context by loading redundant instructions. Different from "overlapping triggers" above — this specifically checks for skills that cast too wide a net individually, not just overlap with each other.
 
 ### Example transformation suggestions:
 
