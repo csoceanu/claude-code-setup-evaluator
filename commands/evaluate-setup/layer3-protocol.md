@@ -86,9 +86,11 @@ uv run .ai-workspace/scripts/mktmpdir.py deep-eval 2>/dev/null || mkdir -p .tmp/
 
 **For each selected skill:**
 
+The engine auto-detects whether each skill is preventive (contains "never", "do not", "must not" patterns). Preventive skills use red-team mode (adversarial tasks testing whether the skill prevents bad behavior). Standard skills use A/B mode (tasks testing whether the skill improves output quality). No user flag needed.
+
 **a. Generate 4 tasks** using Gemini:
 ```bash
-uv run --project "$PROJECT_DIR" --extra deep python -m the_evaluator.deep_eval generate-tasks <SKILL_DIR> [--red-team] --repos-file .tmp/deep-eval/repos.json
+uv run --project "$PROJECT_DIR" --extra deep python -m the_evaluator.deep_eval generate-tasks <SKILL_DIR> --repos-file .tmp/deep-eval/repos.json
 ```
 This outputs JSON with 4 tasks:
 - Task 1: Knowledge test (no repo)
@@ -167,7 +169,7 @@ uv run --project "$PROJECT_DIR" --extra deep python -m the_evaluator.deep_eval j
   "<TASK_DESCRIPTION>" \
   .tmp/deep-eval/<skill>_task<N>_withskill.txt \
   .tmp/deep-eval/<skill>_task<N>_bare.txt \
-  [--red-team] \
+  \
   --skill-file <SKILL_DIR>/SKILL.md \
   --comparison-type absolute
 ```
@@ -178,7 +180,7 @@ uv run --project "$PROJECT_DIR" --extra deep python -m the_evaluator.deep_eval j
   "<TASK_DESCRIPTION>" \
   .tmp/deep-eval/<skill>_task<N>_withskill.txt \
   .tmp/deep-eval/<skill>_task<N>_allexcept.txt \
-  [--red-team] \
+  \
   --skill-file <SKILL_DIR>/SKILL.md \
   --comparison-type marginal
 ```
@@ -238,7 +240,7 @@ Write to `evaluate-setup-deep-log.md` (if that file exists, append a number: `ev
 **Date:** [today]
 **Skills tested:** [list]
 **Repositories used:** [list]
-**Mode:** standard / red-team
+**Mode:** [standard or red-team — auto-detected per skill]
 
 ## How This Evaluation Works
 
