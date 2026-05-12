@@ -11,6 +11,14 @@ Run all 3 evaluation layers on a single skill to determine whether it earns its 
 - **Layer 2 (Prompt):** Contextual rubric scoring — evaluate this skill individually AND in context of all other skills, commands, and CLAUDE.md
 - **Layer 3 (A/B Testing):** Empirical test — does this skill actually change Claude's behavior?
 
+## Hard Rules
+
+1. **Never give a verdict without running the rubric.** You MUST read the actual file content and score all rubric dimensions before assigning a star rating or verdict. Layer 1 diagnostics are input data, not the verdict.
+2. **Every dimension must have a score and justification.** No shortcuts. Both the individual rubric AND the contextual analysis must be fully scored before the verdict line.
+3. **Read before you judge.** Do not summarize based on Layer 1 output alone. You must read the actual SKILL.md content (and reference files if they exist) to evaluate quality.
+4. **Don't manufacture problems.** If the skill is good, say so. Only recommend changes that would make a real difference.
+5. **Always end with a short summary.** Regardless of output format, the last thing the user sees is the terminal summary.
+
 ## Step 1: Select the Skill
 
 Discover all skills in the workspace (search for directories containing SKILL.md files).
@@ -57,40 +65,114 @@ Read the JSON output. This gives you diagnostics with rule IDs, severities, and 
 
 ## Step 4: Run Layer 2 (Prompt)
 
+### 4.1: Read the files
+
 Read the skill's actual content:
 1. The SKILL.md file
-2. All files in the skill's `skills/` subdirectory (reference files)
-3. The skill's `guidelines.md` (if it exists)
+2. All files in the skill's `skills/` subdirectory (reference files). Score the COMBINED content (SKILL.md + reference files), not just the entry point.
+3. The skill's `guidelines.md` (if it exists) — behavioral rules, hard limits, safety constraints
 
 Also read for context (but don't score these — they're context for evaluating the target skill):
 4. All OTHER skill SKILL.md files in the workspace — to check for overlap and redundancy
 5. CLAUDE.md — to check for conflicts and duplication
 6. Hooks in `.claude/settings.json` — to check if the skill should be a hook instead
 
-### Rubric: Individual Assessment
+### 4.2: Individual Rubric (5 dimensions)
 
-Score the skill on 5 dimensions (same rubric as evaluate-setup):
+Score the skill on 5 dimensions. Each dimension gets a 1-5 score with a one-sentence justification citing specific evidence from the skill content.
 
-**Specificity (0.25)** — Are instructions specific and actionable, or vague platitudes?
-**Redundancy (0.25)** — Does this skill teach Claude something it doesn't already know? Check against:
-  - Claude's default behavior (generic advice = redundant)
-  - Other skills in the workspace (overlap = partially redundant)
-  - CLAUDE.md content (duplication = wasted tokens)
-**Trigger quality (0.20)** — Will the description activate on the right tasks?
-**Token efficiency (0.15)** — Is it well-sized? Could it use progressive disclosure?
-**Content quality (0.15)** — Structure, examples, references, error handling?
+**Specificity (weight 0.25)**
+- 1: Entirely vague platitudes, no actionable instructions
+- 2: Mostly generic advice with one or two specific rules
+- 3: Mix of specific and generic; some rules change Claude's behavior
+- 4: Mostly specific, actionable instructions with concrete patterns
+- 5: Every instruction is specific, actionable, includes concrete patterns or examples
 
-Score each 1-5 with one-sentence justification. Calculate overall star rating.
+**Redundancy (weight 0.25)**
+- 1: Every instruction duplicates Claude's default behavior
+- 2: 75%+ is default behavior, very little unique value
+- 3: Some unique value, but 50%+ is default behavior
+- 4: Mostly unique, with minor overlap with Claude's defaults
+- 5: Entirely unique — teaches Claude something it genuinely doesn't know
 
-### Contextual Analysis
+Things Claude already does by default (always redundant):
+- "Write clean, readable code"
+- "Be helpful and thorough"
+- "Handle errors properly" (too vague to add value)
+- "Follow best practices"
+- "Use proper formatting"
+- "Think step by step"
+- "Consider edge cases"
 
-Beyond the individual rubric, evaluate the skill in context of the whole setup:
+A skill is NOT redundant if it provides specific, actionable rules. "Always use `raise from` for exception chaining in Python" is specific enough to change behavior.
 
-- **Overlap with other skills:** Does any other skill cover the same domain? How much content is shared? Could they be merged?
-- **Conflict with CLAUDE.md:** Does the skill contradict anything in CLAUDE.md?
-- **Conflict with other skills:** Does this skill's advice conflict with another skill's?
-- **Type appropriateness:** Should this be a skill (auto-triggered), a command (user-triggered), or a hook (deterministic)?
-- **Progressive disclosure:** If monolithic (>800 tokens), should it split into thin SKILL.md + reference files?
+Also check for overlap with Claude's built-in behavior. Claude already does many things by default (plan mode, code review, commit messages, code explanation). A skill that just wraps a Claude default without adding specific rules is redundant. Ask: "if I deleted this skill, would Claude behave differently?" If not → redundant.
+
+Check redundancy against three sources:
+- Claude's default behavior (generic advice = redundant)
+- Other skills in the workspace (overlap = partially redundant)
+- CLAUDE.md content (duplication = wasted tokens)
+
+**Trigger quality (weight 0.20)**
+- 1: No description, or description triggers on everything, or uses coercive language with broad scope
+- 2: Description exists but is too broad, too narrow, or uses coercive language with narrow scope
+- 3: Description is reasonable but could be more precise
+- 4: Good description that targets the right tasks most of the time
+- 5: Description precisely targets the right tasks; starts with "Use when"; doesn't overlap with other skills
+
+**Autonomy impact (scored within Trigger quality):** Skills should guide, not mandate.
+- **Coercive language in description:** "MUST use this", "ALWAYS use this before", "NEVER skip" — cap trigger quality at 2/5 if the description mandates activation.
+- **Hard gates in skill body:** "Do NOT proceed until", "STOP and do X first" — appropriate for narrow safety concerns, not broad workflows.
+- **Broad category intercept:** "any creative work", "all code changes" — skills that claim authority over entire categories will over-trigger.
+- **The test:** Ask "could a reasonable user want to skip this skill and go straight to coding?" If yes, the trigger language shouldn't prevent that.
+
+**Token efficiency (weight 0.15)**
+- 1: >3,000 tokens with low value density
+- 2: 2,000-3,000 tokens, or under 1,500 with very low value
+- 3: Under 1,500 tokens, some padding that could be trimmed
+- 4: Well-sized, minor optimization possible
+- 5: Every token earns its place; high value-to-token ratio
+
+Note: Token budget applies to SKILL.md only (the always-loaded cost). Reference files in a `skills/` subdirectory load on demand and cost zero tokens until read. A 200-token SKILL.md with 2,000 tokens of reference files is more efficient than a 2,200-token monolithic SKILL.md. If SKILL.md is over ~800 tokens and contains detailed procedures or tables, recommend splitting into thin SKILL.md + reference files (progressive disclosure).
+
+**Content quality (weight 0.15)**
+- 1: No structure, no examples, broken references
+- 2: Minimal structure, vague instructions
+- 3: Decent structure, some examples, no broken references
+- 4: Well-organized with examples and clear sections
+- 5: Well-organized, includes examples, references valid files, covers edge cases
+
+Additional quality checks (score within Content quality):
+- **Cognitive load:** For workflow-type skills — are steps digestible? Does any phase require synthesizing more than 3 inputs? Score N/A for pure knowledge skills.
+- **Error handling:** For skills that execute commands or call APIs — does the skill define what happens when something fails? Score N/A for pure knowledge skills.
+- **Guidelines separation:** If the skill contains hard limits inline (MUST/NEVER/ALWAYS) but has no `guidelines.md`, recommend extracting. Not a negative score — a recommendation for complex skills.
+
+**Scoring:**
+- Calculate overall: `round(specificity*0.25 + redundancy*0.25 + trigger*0.20 + efficiency*0.15 + quality*0.15)`
+- Assign verdict: **KEEP** (4-5 stars), **REVIEW** (3 stars), **REMOVE** (1-2 stars)
+
+### 4.3: Contextual Analysis (5 dimensions)
+
+Evaluate the skill in context of the whole setup. Each dimension gets a severity rating.
+
+**Overlap with other skills** — NONE / MINOR / SIGNIFICANT
+  Does any other skill cover the same domain? How much content is shared? Name the overlapping skills and the specific shared content. Could they be merged?
+
+**Conflict with CLAUDE.md** — NONE / MINOR / SIGNIFICANT
+  Does the skill contradict anything in CLAUDE.md? Cite the specific conflicting instructions.
+
+**Conflict with other skills** — NONE / MINOR / SIGNIFICANT
+  Does this skill's advice conflict with another skill's? Name the skills and the contradiction.
+
+**Type appropriateness** — CORRECT / WRONG TYPE
+  Should this be a skill (auto-triggered), a command (user-triggered), or a hook (deterministic)?
+  - If the skill describes a user-triggered workflow → should be a command
+  - If the skill contains rules that MUST happen every time → should be a hook
+  - If the skill teaches passive behavior → correct as a skill
+
+**Structure optimization** — OPTIMAL / COULD IMPROVE
+  If SKILL.md is >800 tokens and monolithic: recommend splitting into thin SKILL.md + reference files.
+  If the skill has inline hard limits but no `guidelines.md`: recommend extracting.
 
 ## Step 5: Run Layer 3 (A/B Testing)
 
@@ -170,9 +252,11 @@ Map each Layer 1 diagnostic to its corresponding check. Checks with no diagnosti
 
 ### Contextual Analysis
 
-  Overlap with other skills: [findings]
-  Conflicts with CLAUDE.md: [findings]
-  Type appropriateness: [skill/command/hook assessment]
+  Overlap with other skills:   [NONE/MINOR/SIGNIFICANT] — [findings]
+  Conflict with CLAUDE.md:     [NONE/MINOR/SIGNIFICANT] — [findings]
+  Conflict with other skills:  [NONE/MINOR/SIGNIFICANT] — [findings]
+  Type appropriateness:        [CORRECT/WRONG TYPE] — [assessment]
+  Structure optimization:      [OPTIMAL/COULD IMPROVE] — [findings]
 
   + What's good
   ! What could improve
