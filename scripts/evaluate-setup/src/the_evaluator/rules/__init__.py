@@ -19,6 +19,8 @@ def register_all_rules() -> None:
     from the_evaluator.rules.commands.script_exists import CommandScriptExists
     from the_evaluator.rules.commands.no_prompt_injection import CommandNoPromptInjection
     from the_evaluator.rules.commands.no_credential_access import CommandNoCredentialAccess
+    from the_evaluator.rules.commands.skill_overlap import CommandSkillOverlap
+    from the_evaluator.rules.commands.duplicate_detection import CommandDuplicateDetection
 
     # CLAUDE.md rules
     from the_evaluator.rules.claude_md.exists import ClaudeMdExists
@@ -49,6 +51,8 @@ def register_all_rules() -> None:
         CommandScriptExists,
         CommandNoPromptInjection,
         CommandNoCredentialAccess,
+        CommandSkillOverlap,
+        CommandDuplicateDetection,
         ClaudeMdExists,
         ClaudeMdSkillDuplication,
         HooksValidStructure,

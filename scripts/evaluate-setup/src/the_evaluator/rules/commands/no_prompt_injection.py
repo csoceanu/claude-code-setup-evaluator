@@ -20,9 +20,9 @@ class CommandNoPromptInjection:
         description="Command definition should not contain prompt injection patterns",
         category=RuleCategory.SECURITY,
         messages={
-            "injection_detected": "Potential prompt injection pattern: '{{label}}' at line {{line}}",
-            "injection_in_code_block": "Prompt injection pattern '{{label}}' at line {{line}} (inside code block — likely documentation)",
-            "injection_in_example": "Prompt injection pattern '{{label}}' at line {{line}} (in example/quote context)",
+            "injection_detected": "Line {{line}} contains a word pattern ('{{label}}') that could be used to manipulate Claude. Check if this is intentional content or an actual risk.",
+            "injection_in_code_block": "Line {{line}} contains '{{label}}' inside a code block — likely safe (documentation or example).",
+            "injection_in_example": "Line {{line}} contains '{{label}}' in a quote or example — likely safe.",
         },
         target_type=TargetType.COMMAND,
     )

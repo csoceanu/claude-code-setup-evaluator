@@ -272,8 +272,19 @@ def parse_hooks(settings_path: str) -> ParsedHooks:
     if isinstance(hooks_data, dict):
         for event, hook_list in hooks_data.items():
             if isinstance(hook_list, list):
-                for hook in hook_list:
-                    hooks.append({"event": event, **(hook if isinstance(hook, dict) else {"command": str(hook)})})
+                for hook_entry in hook_list:
+                    if not isinstance(hook_entry, dict):
+                        hooks.append({"event": event, "command": str(hook_entry)})
+                        continue
+                    nested = hook_entry.get("hooks", [])
+                    if isinstance(nested, list) and nested:
+                        for sub_hook in nested:
+                            if isinstance(sub_hook, dict) and "command" in sub_hook:
+                                hooks.append({"event": event, "command": sub_hook["command"], **{k: v for k, v in hook_entry.items() if k != "hooks"}})
+                    elif "command" in hook_entry:
+                        hooks.append({"event": event, **hook_entry})
+                    else:
+                        hooks.append({"event": event, **hook_entry})
 
     return ParsedHooks(
         file_path=settings_path, hooks=hooks, raw_content=raw_content,
@@ -411,6 +422,7 @@ def _run_rules(
     target: object | None,
     config_rules: dict[str, str | list] | None,
     all_skills: list[ParsedSkill] | None = None,
+    all_commands: list[ParsedCommand] | None = None,
 ) -> tuple[list[Diagnostic], int]:
     """Run rules for a given target type. Returns (diagnostics, suppression_count)."""
     diagnostics: list[Diagnostic] = []
@@ -478,6 +490,7 @@ def _run_rules(
             options=options,
             target=target,
             all_skills=all_skills or [],
+            all_commands=all_commands or [],
         )
         rule.create(context)
 
@@ -513,7 +526,12 @@ def lint(skill_path: str, config_rules: dict[str, str | list] | None = None) -> 
     )
 
 
-def lint_command(command_path: str, config_rules: dict[str, str | list] | None = None) -> LintResult:
+def lint_command(
+    command_path: str,
+    config_rules: dict[str, str | list] | None = None,
+    all_skills: list[ParsedSkill] | None = None,
+    all_commands: list[ParsedCommand] | None = None,
+) -> LintResult:
     """Lint a single command directory."""
     cmd = parse_command(command_path)
     diagnostics: list[Diagnostic] = []
@@ -527,6 +545,7 @@ def lint_command(command_path: str, config_rules: dict[str, str | list] | None =
     rule_diags, suppression_count = _run_rules(
         TargetType.COMMAND, cmd.command_md_path, cmd.raw_content,
         skill=None, target=cmd, config_rules=config_rules,
+        all_skills=all_skills, all_commands=all_commands,
     )
     diagnostics.extend(rule_diags)
 

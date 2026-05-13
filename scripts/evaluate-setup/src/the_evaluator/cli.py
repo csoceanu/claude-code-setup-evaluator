@@ -16,6 +16,7 @@ from the_evaluator.engine.engine import (
     lint_command,
     lint_directory,
     lint_hooks,
+    parse_command,
     parse_skill,
 )
 from the_evaluator.engine.registry import clear_rules
@@ -97,12 +98,13 @@ def scan(
         all_results.extend(skill_results)
 
     # --- Commands ---
+    parsed_skills = [parse_skill(str(r.target_path)) for r in skill_results] if skill_results else []
     cmd_dirs = _find_commands(scan_path)
+    parsed_commands = [parse_command(str(d)) for d in cmd_dirs]
     for cmd_dir in cmd_dirs:
-        all_results.append(lint_command(str(cmd_dir), config.rules))
+        all_results.append(lint_command(str(cmd_dir), config.rules, all_skills=parsed_skills, all_commands=parsed_commands))
 
     # --- CLAUDE.md ---
-    parsed_skills = [parse_skill(str(r.target_path)) for r in skill_results] if skill_results else []
     claude_paths = _find_claude_mds(scan_path)
     if claude_paths:
         for claude_path in claude_paths:
@@ -117,10 +119,6 @@ def scan(
     # --- Agents ---
     agent_files = _find_agents(scan_path)
     if agent_files:
-        parsed_skills = (
-            [parse_skill(str(r.target_path)) for r in skill_results]
-            if skill_results else []
-        )
         for agent_file in agent_files:
             all_results.append(lint_agent(str(agent_file), config.rules, parsed_skills))
 
@@ -170,14 +168,17 @@ def scan(
     sys.exit(exit_code)
 
 
+_SELF_COMMANDS = {"evaluate-setup", "evaluate-skill"}
+
+
 def _find_commands(scan_path: Path) -> list[Path]:
-    """Find command directories under a path."""
+    """Find command directories under a path, excluding the evaluator's own commands."""
     results = []
     commands_dir = scan_path / "commands"
     if not commands_dir.is_dir():
         commands_dir = scan_path
     for p in sorted(commands_dir.iterdir()):
-        if p.is_dir() and (p / "command.md").exists():
+        if p.is_dir() and (p / "command.md").exists() and p.name not in _SELF_COMMANDS:
             results.append(p)
     return results
 

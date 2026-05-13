@@ -150,6 +150,7 @@ class RuleContext:
     options: list[Any] = field(default_factory=list)
     target: Optional[ParsedFile] = None
     all_skills: list[ParsedSkill] = field(default_factory=list)
+    all_commands: list[ParsedCommand] = field(default_factory=list)
 
     @property
     def command(self) -> ParsedCommand | None:

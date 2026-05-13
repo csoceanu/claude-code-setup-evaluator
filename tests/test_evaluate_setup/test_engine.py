@@ -13,7 +13,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from the_evaluator.engine.types import Severity, RuleCategory, RuleMeta, DiagnosticLocation, ReportDescriptor
 from the_evaluator.engine.registry import register_rule, get_all_rules, clear_rules, get_rules_by_category
-from the_evaluator.engine.engine import parse_skill, lint, lint_command, lint_claude_md, lint_directory
+from the_evaluator.engine.engine import parse_skill, parse_command, lint, lint_command, lint_claude_md, lint_directory
 from the_evaluator.engine.suppression import parse_suppressions, is_suppressed
 from the_evaluator.config.loader import load_config
 from the_evaluator.config.presets import PRESETS
@@ -376,3 +376,102 @@ class TestLint:
         assert "good-skill" in names
         assert "bad-skill" in names
         assert "security-skill" in names
+
+
+class TestCommandSkillOverlap:
+    def setup_method(self):
+        clear_rules()
+        from the_evaluator.rules import register_all_rules
+        register_all_rules()
+
+    def test_overlapping_command_and_skill_detected(self, tmp_path):
+        skill_dir = tmp_path / "my-skill"
+        skill_dir.mkdir()
+        shared_content = "Always use timeout=30 on requests. " * 30
+        (skill_dir / "SKILL.md").write_text(
+            f'---\nname: my-skill\ndescription: "API patterns"\n---\n{shared_content}\n'
+        )
+        parsed_skills = [parse_skill(str(skill_dir))]
+
+        cmd_dir = tmp_path / "my-command"
+        cmd_dir.mkdir()
+        (cmd_dir / "command.md").write_text(
+            f'---\ndescription: "API review"\n---\n{shared_content}\n'
+        )
+
+        result = lint_command(str(cmd_dir), all_skills=parsed_skills)
+        overlap_diags = [d for d in result.diagnostics if d.rule_id == "command/skill-overlap"]
+        assert len(overlap_diags) == 1
+        assert "my-skill" in overlap_diags[0].message
+
+    def test_different_command_and_skill_no_false_positive(self, tmp_path):
+        skill_dir = tmp_path / "python-skill"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            '---\nname: python-skill\ndescription: "Python conventions"\n---\n'
+            'Use dotenv for credential management. Always validate environment variables at startup. '
+            'Set timeout=30 on all HTTP requests. Retry only transient failures.\n'
+        )
+        parsed_skills = [parse_skill(str(skill_dir))]
+
+        cmd_dir = tmp_path / "deploy-cmd"
+        cmd_dir.mkdir()
+        (cmd_dir / "command.md").write_text(
+            '---\ndescription: "Deploy to staging"\n---\n'
+            'Run the deployment pipeline. Check container health. Verify DNS propagation. '
+            'Monitor error rates for 15 minutes after deploy.\n'
+        )
+
+        result = lint_command(str(cmd_dir), all_skills=parsed_skills)
+        overlap_diags = [d for d in result.diagnostics if d.rule_id == "command/skill-overlap"]
+        assert len(overlap_diags) == 0
+
+
+class TestCommandDuplicateDetection:
+    def setup_method(self):
+        clear_rules()
+        from the_evaluator.rules import register_all_rules
+        register_all_rules()
+        from the_evaluator.rules.commands.duplicate_detection import reset_command_duplicate_state
+        reset_command_duplicate_state()
+
+    def test_duplicate_commands_detected(self, tmp_path):
+        shared_body = "Review code for security vulnerabilities and credential leaks. " * 20
+
+        cmd1 = tmp_path / "review-security"
+        cmd1.mkdir()
+        (cmd1 / "command.md").write_text(f'---\ndescription: "Security review"\n---\n{shared_body}\n')
+
+        cmd2 = tmp_path / "sec-check"
+        cmd2.mkdir()
+        (cmd2 / "command.md").write_text(f'---\ndescription: "Security check"\n---\n{shared_body}\n')
+
+        parsed_commands = [parse_command(str(cmd1)), parse_command(str(cmd2))]
+
+        lint_command(str(cmd1), all_commands=parsed_commands)
+        result2 = lint_command(str(cmd2), all_commands=parsed_commands)
+        dup_diags = [d for d in result2.diagnostics if d.rule_id == "command/duplicate-detection"]
+        assert len(dup_diags) == 1
+        assert "review-security" in dup_diags[0].message
+
+    def test_different_commands_no_false_positive(self, tmp_path):
+        cmd1 = tmp_path / "deploy"
+        cmd1.mkdir()
+        (cmd1 / "command.md").write_text(
+            '---\ndescription: "Deploy"\n---\n'
+            'Run deployment pipeline with health checks and DNS verification.\n'
+        )
+
+        cmd2 = tmp_path / "review"
+        cmd2.mkdir()
+        (cmd2 / "command.md").write_text(
+            '---\ndescription: "Review"\n---\n'
+            'Review code quality with linting, type checking, and test coverage.\n'
+        )
+
+        parsed_commands = [parse_command(str(cmd1)), parse_command(str(cmd2))]
+
+        lint_command(str(cmd1), all_commands=parsed_commands)
+        result2 = lint_command(str(cmd2), all_commands=parsed_commands)
+        dup_diags = [d for d in result2.diagnostics if d.rule_id == "command/duplicate-detection"]
+        assert len(dup_diags) == 0
