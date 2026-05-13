@@ -3,6 +3,7 @@
 **Status:** v2.0 built · two-command architecture
 **Author:** Benjamin Kapner + design review with Claude
 **Last updated:** May 2026
+**Changes from v2.0:** Updated spec to match code reality — 21 rules across 5 file types (added command security rules, agent rules), removed phantom CLI flags (--commands/--claude-md/--hooks/--all), updated rule IDs, presets, JSON output format, Layer 3 judge algorithm, and file naming conventions.
 **Changes from v1.4:** Split into two separate commands: `/evaluate-setup` (L1+L2 on entire setup) and `/evaluate-skill` (L1+L2+L3 on a single skill). evaluate-setup no longer asks scope — it always evaluates everything. evaluate-skill runs all 3 layers on one skill: static analysis, contextual rubric scoring (individual + in context of all other skills), and A/B testing. Layer 3 protocol updated: agents save their own output files, allexcept prompts pre-built before agent dispatch, skills processed sequentially.
 **Changes from v1.3:** Layer 3 A/B testing now generates 3 behavioral repo-based tasks instead of 4. Task generation prompt rewritten to create situations where the skill's rules naturally apply.
 **Changes from v1.2:** Split command.md into thin command + reference files. Added Layer 2 autonomy analysis, command size thresholds, and behavioral pattern checks.
@@ -21,7 +22,7 @@ the-evaluator is two commands for two different jobs:
 
 Both commands use the same three layers, but at different scope:
 
-**Layer 1 — Rules (rule engine, no AI).** A pluggable rule engine scans skill files and runs mechanical checks: token counting, duplicate detection, broken references, format validation, description quality, security scanning (prompt injection, credential exposure). Configured via presets (`recommended`, `strict`, `security`). Outputs JSON with per-rule diagnostics.
+**Layer 1 — Rules (rule engine, no AI).** A pluggable rule engine scans files and runs mechanical checks across 5 file types (skills, commands, CLAUDE.md, hooks, agents) with 21 rules: token counting, duplicate detection, broken references, format validation, description quality, security scanning (prompt injection, credential exposure). Configured via presets (`recommended`, `strict`, `security`). Outputs JSON with per-rule diagnostics.
 
 **Layer 2 — Prompt (Claude in your session).** Claude reads files and evaluates against structured rubrics. In `/evaluate-setup`: scores every skill, command, CLAUDE.md, and hook, then does cross-type optimization (should this skill be a hook? does CLAUDE.md duplicate a skill?). In `/evaluate-skill`: scores one skill individually AND in context of all other setup components (overlap, conflicts, type appropriateness).
 
@@ -84,13 +85,12 @@ The system has three layers. The first two always run. The third is optional.
 
 A pluggable rule engine scans your skill files and runs mechanical checks. Each check is a self-contained rule — its own file, its own metadata, registered in a central registry. The engine orchestrates: parse each skill → load config (which rules to run, at what severity) → run enabled rules → collect diagnostics → output JSON.
 
-Out-of-the-box rules check:
-- How many tokens does each skill use?
-- Are any two skills near-identical copies of each other?
-- Do referenced files actually exist?
-- Does each skill have a proper description so Claude knows when to load it?
-- Is the formatting correct per the skill spec?
-- Does the skill contain prompt injection patterns or credential exposure?
+Out-of-the-box rules check (21 rules across 5 file types):
+- **Skills (9 rules):** Does SKILL.md exist? Is frontmatter valid? Is the description present, high-quality, and use-case aware? Is the token budget respected? Do referenced files exist? Are any two skills near-duplicates? Are there prompt injection patterns or credential references?
+- **Commands (4 rules):** Is the description present? Do referenced scripts exist? Prompt injection and credential access checks.
+- **CLAUDE.md (2 rules):** Does the file exist? Does it duplicate content from skills?
+- **Hooks (1 rule):** Valid structure, no dangerous patterns, scripts exist.
+- **Agents (6 rules):** Is the description present? Do referenced skills exist? Is the disallowedTools format valid? Do body constraints match disallowedTools? Prompt injection and credential access checks.
 
 Users configure which rules run via presets (`recommended`, `strict`, `security`) or per-rule overrides in `.evaluator.yaml`. Skills can suppress specific rules with inline comments (`<!-- evaluator-ignore: rule-id -->`).
 
@@ -124,7 +124,7 @@ For users who want empirical proof, not just an expert opinion. This requires `G
 
 3. **Quality screening.** Before judging, responses are checked for completeness. Tasks where both responses are truncated or unusable are skipped — no judge call is made. This saves API calls on tests that can't produce meaningful signal.
 
-4. **Gemini grades with redundancy-first judging.** For each valid pair, Gemini receives both responses in randomized order (blinded). The judge evaluates in two steps: (1) Redundancy check (~70%): did one response apply specific conventions from the skill that the other missed? If both responses follow the same conventions equally well, the skill is redundant → verdict is TIE. (2) Quality check (~30%): is one response clearly better? Only matters if step 1 didn't produce a winner. The skill file is provided to the judge as context so it can check for specific convention adherence. Each pair gets 3 blind votes (repeat-and-vote), majority wins. Confidence: HIGH if unanimous, LOW if 2-1 split. Tasks where the judge reports poor test quality are excluded from the verdict.
+4. **Gemini grades with blind dimension scoring.** For each valid pair, Gemini receives both responses in randomized order (blinded). The judge scores each response independently on 5 dimensions (1-5 scale): accuracy, specificity, actionability, completeness, and response_posture. The winner is determined by total score difference: >=3 = clear winner, 1-2 = marginal winner, 0 = tie. Each pair gets 3 blind votes (repeat-and-vote), majority wins. Confidence: HIGH if unanimous, LOW if 2-1 split. Tasks where the judge reports poor test quality are excluded from the verdict.
 
 5. **The verdict** (based on good-quality tasks only). KEEP (wins > losses and wins > ties), NO IMPACT (mostly ties — skill is redundant), HURTS (losses > wins).
 
@@ -359,6 +359,10 @@ the-evaluator/
     evaluate-skill/
       command.md                   # L1+L2+L3: single-skill deep evaluation command
       layer3-protocol.md           # Layer 3: A/B test execution protocol (loaded on demand)
+  docs/
+    spec.md                        # This file — full specification
+    HOW-EVALUATE-SETUP-WORKS.md    # Plain-language architecture doc for /evaluate-setup
+    HOW-EVALUATE-SKILL-WORKS.md    # Plain-language architecture doc for /evaluate-skill
   tests/
     test_command_prompts.py        # Structural validation tests for command.md and SKILL.md files
     test_workspace_scripts.py      # Workspace infrastructure tests
@@ -366,23 +370,23 @@ the-evaluator/
     evaluate-setup/
       pyproject.toml               # Package config + dependencies
       src/the_evaluator/
-        cli.py                     # CLI entry point (scan subcommand with --all/--commands/--claude-md/--hooks)
-        deep_eval.py               # Layer 3: A/B + red-team evaluation
+        cli.py                     # CLI entry point (scan subcommand with --preset/--config/--target)
+        deep_eval.py               # Layer 3: A/B + red-team evaluation (screen-skills, generate-tasks, validate-tasks, judge)
         engine/                    # Rule engine core
-          types.py                 # Dataclasses + TargetType enum (skill/command/claude_md/hooks)
+          types.py                 # Dataclasses + TargetType enum (skill/command/claude_md/hooks/agent)
           registry.py              # Rule registry (register, get_all, get_by_category)
-          engine.py                # Parsers + lint functions for all 4 file types
+          engine.py                # Parsers + lint functions for all 5 file types
           suppression.py           # Inline suppression comment parser
         rules/                     # Rule implementations (one file per rule)
-          __init__.py              # register_all_rules() — registers all 15 rules
+          __init__.py              # register_all_rules() — registers all 21 rules
           structural/
             skill_md_exists.py     # Does SKILL.md exist in the directory?
           frontmatter/
             description_required.py # Is the description field present and non-empty?
-            trigger_quality.py     # Does description start with "Use when"?
+            description_quality.py # Third-person POV, use-case context, length checks
             format_valid.py        # Is frontmatter structure valid per skill spec?
           content/
-            token_budget.py        # Is the skill under 1,500 tokens?
+            token_budget.py        # Is the skill under the token limit and under 500 lines?
             broken_references.py   # Do referenced files actually exist?
             duplicate_detection.py # Is this skill a near-copy of another?
           security/
@@ -391,12 +395,20 @@ the-evaluator/
           commands/                # Command-specific rules
             description_required.py # Does the command have a description?
             script_exists.py       # Do referenced scripts exist?
+            no_prompt_injection.py # Same injection check for commands
+            no_credential_access.py # Same credential check for commands
           claude_md/               # CLAUDE.md-specific rules
-            line_count.py          # Is CLAUDE.md under 300 lines?
-            generic_advice.py      # Does it contain advice Claude already follows?
+            exists.py              # Does CLAUDE.md exist?
             skill_duplication.py   # Does it duplicate content from skills?
           hooks/                   # Hooks-specific rules
             valid_structure.py     # Valid structure, dangerous patterns, script existence
+          agents/                  # Agent-specific rules
+            description_required.py # Does the agent have a description?
+            referenced_skills_exist.py # Do referenced skills exist?
+            disallowed_tools_parseable.py # Is disallowedTools format valid?
+            constraint_body_match.py # Do body constraints match disallowedTools?
+            no_prompt_injection.py # Same injection check for agents
+            no_credential_access.py # Same credential check for agents
         config/                    # Configuration system
           types.py                 # EvaluatorConfig, ResolvedConfig dataclasses
           loader.py                # Load .evaluator.yaml or --preset flag
@@ -412,13 +424,17 @@ the-evaluator/
 
 Python package (`scripts/evaluate-setup/`). No LLM calls. Run via `uv run --project scripts/evaluate-setup evaluate-setup scan`.
 
-**Input:** A path + flags for which file types to scan.
+**Input:** A path to scan. The tool always scans all file types (skills, commands, CLAUDE.md, hooks, agents).
 
 **CLI:**
 
 ```bash
-uv run --project scripts/evaluate-setup evaluate-setup scan <path> [--preset recommended|strict|security] [--commands] [--claude-md] [--hooks] [--all] [--target <skill-name>]
+uv run --project scripts/evaluate-setup evaluate-setup scan <path> [--preset recommended|strict|security] [--config <path>] [--target <skill-name>]
 ```
+
+- `--preset`: Evaluation preset (default: recommended)
+- `--config`: Path to a custom `.evaluator.yaml` config file
+- `--target`: Focus on a single skill by name (still scans everything for context, but filters output)
 
 **Output:** JSON to stdout with per-rule diagnostics for all scanned file types. Human-readable summary to stderr.
 
@@ -614,42 +630,55 @@ class DescriptionRequired:
             ))
 ```
 
-**Example fixable rule** (`scripts/rules/frontmatter/trigger_quality.py`):
+**Example quality rule** (`rules/frontmatter/description_quality.py`):
 
 ```python
-@dataclass
-class TriggerQuality:
+class DescriptionQuality:
     meta = RuleMeta(
-        id="frontmatter/trigger-quality",
+        id="frontmatter/description-quality",
         default_severity=Severity.WARNING,
-        fixable=True,
-        description="Description should start with 'Use when' for Claude Search Optimization",
+        fixable=False,
+        description="Description should follow Anthropic's best practices for skill discovery",
         category=RuleCategory.FRONTMATTER,
         messages={
-            "missing_prefix": "Description does not start with 'Use when' — "
-                              "this hurts Claude Code's ability to activate the skill at the right time",
+            "first_person": "Description uses first-person POV ('{{match}}') — Anthropic recommends third-person",
+            "no_use_case": "Description lacks use-case context — include phrases like 'use when', 'applies to'",
+            "too_long": "Description is {{length}} characters — Anthropic's documented limit is 1,024",
+            "too_short": "Description is only {{length}} characters — too vague for reliable skill matching",
         },
     )
 
     def create(self, context: RuleContext) -> None:
         skill = context.skill
+        if skill.parse_errors:
+            return
         description = skill.frontmatter.get("description", "")
-        if description and not description.lower().startswith("use when"):
-            context.report(ReportDescriptor(
-                message_id="missing_prefix",
-                location=DiagnosticLocation(file=skill.skill_md_path, start_line=skill.frontmatter_start_line),
-                fix=DiagnosticFix(
-                    description='Add "Use when" prefix to description',
-                    replacement=f"Use when {description[0].lower()}{description[1:]}",
-                ),
-            ))
+        if not isinstance(description, str) or not description:
+            return
+        loc = DiagnosticLocation(file=skill.skill_md_path, start_line=skill.frontmatter_start_line or 1)
+
+        # Check first-person POV
+        match = re.search(r"\bI\s+(?:will|can|am|help)\b", description, re.I)
+        if match:
+            context.report(ReportDescriptor(message_id="first_person", data={"match": match.group(0)}, location=loc))
+
+        # Check use-case context phrases
+        desc_lower = description.lower()
+        if not any(phrase in desc_lower for phrase in ["use when", "use for", "applies to", "relevant for", ...]):
+            context.report(ReportDescriptor(message_id="no_use_case", location=loc))
+
+        # Length checks
+        if len(description) > 1024:
+            context.report(ReportDescriptor(message_id="too_long", data={"length": str(len(description))}, location=loc))
+        if len(description) < 20:
+            context.report(ReportDescriptor(message_id="too_short", data={"length": str(len(description))}, location=loc))
 ```
 
 **Example security rule** (`scripts/rules/security/no_prompt_injection.py`):
 
 The security rule checks for known prompt injection patterns (e.g., "ignore previous instructions", "disregard all prior", "you are now", "system prompt override"). It uses context-aware severity — patterns found inside code fences or quoted examples are downgraded from error to warning, since they're likely documentation rather than actual injection attempts. This pattern is borrowed directly from skilleval's `no-prompt-injection` rule.
 
-**Rules shipped with v1.2 (15 rules across 4 file types):**
+**Rules shipped (21 rules across 5 file types):**
 
 **Skill rules (9):**
 
@@ -657,34 +686,48 @@ The security rule checks for known prompt injection patterns (e.g., "ignore prev
 |---|---|---|---|
 | `structural/skill-md-exists` | structural | error | SKILL.md file exists in directory |
 | `frontmatter/description-required` | frontmatter | error | Description field present and non-empty |
-| `frontmatter/trigger-quality` | frontmatter | warning | Description starts with "Use when" |
+| `frontmatter/description-quality` | frontmatter | warning | Third-person POV, use-case context phrases, length 20-1024 chars |
 | `frontmatter/format-valid` | frontmatter | warning | Frontmatter structure valid, name matches directory |
-| `content/token-budget` | content | warning | Skill under 1,500 tokens |
+| `content/token-budget` | content | warning | Skill under token limit and under 500 lines |
 | `content/broken-references` | content | error | Referenced files actually exist |
-| `content/duplicate-detection` | content | warning | No near-duplicate skills (>0.85 similarity) |
+| `content/duplicate-detection` | content | warning | No near-duplicate skills (>0.85 TF-IDF cosine similarity) |
 | `security/no-prompt-injection` | security | error | No injection patterns (context-aware: downgrades in code blocks) |
-| `security/no-credential-access` | security | error | No references to sensitive paths/env vars |
+| `security/no-credential-access` | security | error | No references to sensitive paths/env vars/dangerous commands |
 
-**Command rules (2):**
+**Command rules (6):**
 
 | Rule ID | Category | Default | What it checks |
 |---|---|---|---|
 | `command/description-required` | frontmatter | error | Description present and not too vague (>2 words) |
 | `command/script-exists` | content | warning | Referenced .py scripts exist in command directory |
+| `command/skill-overlap` | content | warning | No command is >60% similar to a skill body (cross-type duplication) |
+| `command/duplicate-detection` | content | warning | No near-duplicate commands (>0.85 TF-IDF cosine similarity) |
+| `command/no-prompt-injection` | security | error | Same injection pattern check as skills |
+| `command/no-credential-access` | security | error | Same credential/dangerous command check as skills |
 
-**CLAUDE.md rules (3):**
+**CLAUDE.md rules (2):**
 
 | Rule ID | Category | Default | What it checks |
 |---|---|---|---|
-| `claude-md/line-count` | content | warning | Under 300 lines |
-| `claude-md/generic-advice` | content | info | No generic phrases Claude already follows ("write clean code", "be helpful", etc.) |
-| `claude-md/skill-duplication` | content | warning | No sections duplicating content from skills (>40% word overlap) |
+| `claude-md/exists` | structural | warning | CLAUDE.md file is present in the project |
+| `claude-md/skill-duplication` | content | warning | No sections duplicating content from skills (word overlap detection) |
 
 **Hooks rules (1):**
 
 | Rule ID | Category | Default | What it checks |
 |---|---|---|---|
 | `hooks/valid-structure` | security | warning | Commands defined, no dangerous patterns (rm -rf, force push), scripts exist |
+
+**Agent rules (6):**
+
+| Rule ID | Category | Default | What it checks |
+|---|---|---|---|
+| `agent/description-required` | frontmatter | error | Description field exists and is not empty |
+| `agent/referenced-skills-exist` | content | error | Every skill listed in frontmatter has a matching SKILL.md |
+| `agent/disallowed-tools-parseable` | frontmatter | warning | Entries match ToolName or ToolName(pattern) format |
+| `agent/constraint-body-match` | content | warning | Body constraints ("cannot push") are backed by disallowedTools |
+| `agent/no-prompt-injection` | security | error | Same injection pattern check as skills |
+| `agent/no-credential-access` | security | error | Same credential check as skills |
 
 #### 5.2.2 Config presets
 
@@ -694,15 +737,28 @@ Three presets control which rules run and at what severity.
 
 ```python
 RECOMMENDED = {
+    # Skill rules
     "structural/skill-md-exists": "error",
     "frontmatter/description-required": "error",
-    "frontmatter/trigger-quality": "warning",
+    "frontmatter/description-quality": "warning",
     "frontmatter/format-valid": "warning",
     "content/token-budget": "warning",
     "content/broken-references": "error",
     "content/duplicate-detection": "warning",
     "security/no-prompt-injection": "error",
     "security/no-credential-access": "error",
+    # Command rules
+    "command/no-prompt-injection": "error",
+    "command/no-credential-access": "error",
+    # CLAUDE.md rules
+    "claude-md/exists": "warning",
+    # Agent rules
+    "agent/description-required": "error",
+    "agent/referenced-skills-exist": "error",
+    "agent/disallowed-tools-parseable": "warning",
+    "agent/constraint-body-match": "warning",
+    "agent/no-prompt-injection": "error",
+    "agent/no-credential-access": "error",
 }
 ```
 
@@ -711,9 +767,12 @@ RECOMMENDED = {
 ```python
 STRICT = {
     **RECOMMENDED,
-    "frontmatter/trigger-quality": "error",    # promoted
-    "frontmatter/format-valid": "error",        # promoted
-    "content/token-budget": "error",            # promoted
+    "frontmatter/description-quality": "error",     # promoted
+    "frontmatter/format-valid": "error",             # promoted
+    "content/token-budget": "error",                 # promoted
+    "claude-md/exists": "error",                     # promoted
+    "agent/disallowed-tools-parseable": "error",     # promoted
+    "agent/constraint-body-match": "error",          # promoted
 }
 ```
 
@@ -723,13 +782,25 @@ STRICT = {
 SECURITY = {
     "structural/skill-md-exists": "off",
     "frontmatter/description-required": "off",
-    "frontmatter/trigger-quality": "off",
+    "frontmatter/description-quality": "off",
     "frontmatter/format-valid": "off",
     "content/token-budget": "off",
     "content/broken-references": "off",
     "content/duplicate-detection": "off",
     "security/no-prompt-injection": "error",
     "security/no-credential-access": "error",
+    # Command security rules
+    "command/no-prompt-injection": "error",
+    "command/no-credential-access": "error",
+    # CLAUDE.md rules
+    "claude-md/exists": "off",
+    # Agent rules
+    "agent/description-required": "off",
+    "agent/referenced-skills-exist": "off",
+    "agent/disallowed-tools-parseable": "off",
+    "agent/constraint-body-match": "off",
+    "agent/no-prompt-injection": "error",
+    "agent/no-credential-access": "error",
 }
 ```
 
@@ -762,7 +833,7 @@ Users can mark intentional exceptions in skill files:
 <!-- evaluator-ignore: content/token-budget -->
 (This skill is intentionally large — it covers 15 edge cases that need to be in one place)
 
-<!-- evaluator-ignore-next-line: frontmatter/trigger-quality -->
+<!-- evaluator-ignore-next-line: frontmatter/description-quality -->
 description: handles all frontend work
 ```
 
@@ -778,36 +849,45 @@ The engine parses these before running rules. Suppressed diagnostics are silentl
 
 ```json
 {
-  "scan_path": "~/.claude/skills/",
+  "scan_path": ".",
   "preset": "recommended",
-  "total_skills": 14,
+  "total_items": 25,
   "total_tokens": 34200,
-  "context_budget_pct": 17.1,
   "summary": {
     "errors": 4,
     "warnings": 6,
     "info": 2,
     "fixable": 2,
-    "suppressed": 1
+    "suppressed": 1,
+    "by_type": {
+      "skill": 14,
+      "command": 6,
+      "claude_md": 2,
+      "hooks": 1,
+      "agent": 2
+    }
   },
-  "skills": [
+  "items": [
     {
       "name": "python-error-handling",
-      "path": "~/.claude/skills/python-error-handling/SKILL.md",
+      "path": "skills/python-error-handling",
+      "type": "skill",
       "tokens": 663,
       "diagnostics": [
         {
-          "rule_id": "frontmatter/trigger-quality",
+          "rule_id": "frontmatter/description-quality",
           "severity": "warning",
-          "message": "Description does not start with 'Use when'",
-          "location": {"file": "SKILL.md", "start_line": 3},
-          "fix": {"description": "Add 'Use when' prefix", "replacement": "Use when working with..."}
+          "message": "Description lacks use-case context — include phrases like 'use when', 'applies to'",
+          "location": {"file": "skills/python-error-handling/SKILL.md", "start_line": 1},
+          "category": "frontmatter"
         }
-      ]
+      ],
+      "error_count": 0,
+      "warning_count": 1,
+      "info_count": 0,
+      "fixable_count": 0,
+      "suppression_count": 0
     }
-  ],
-  "duplicates": [
-    {"skill_a": "pdf-wizard", "skill_b": "pdf-creator", "similarity": 0.91}
   ]
 }
 ```
@@ -901,52 +981,19 @@ Inspired by [deepeval](https://github.com/confident-ai/deepeval)'s approach of r
 
 This rubric replaces the previous unstructured star rating. The criteria (A through E above) remain as the detailed evaluation guide — the rubric dimensions are how those criteria translate into scores.
 
-#### 5.3.2 Single-skill mode
+#### 5.3.2 Single-skill mode (--target)
 
-When the user points `/evaluate-setup` at a single skill (e.g., `/evaluate-setup skills/python-conventions/`), the tool still loads the full setup as context but focuses the report on that one skill.
-
-**How it works:**
-
-1. **Layer 1** scans ALL skills in the parent directory (not just the target) — this is necessary for duplicate detection and overlap analysis. The JSON output includes all skills' data but marks the target skill.
-2. **Layer 2** reads ALL skills + CLAUDE.md + commands, but the rubric report focuses on the target skill with explicit comparisons:
-   - "This skill overlaps with data-pipeline-patterns on API client rules"
-   - "No conflicts detected with CLAUDE.md"
-   - "Trigger description overlaps with security-check's trigger"
-3. **Layer 3** (if selected) runs A/B testing only on the target skill.
-
-**CLI:** The `scan` subcommand has a `--target` flag:
+The `scan` command has a `--target` flag that scans everything but filters the JSON output to only include the target skill's diagnostics. Other items' data is still used for duplicate detection and overlap analysis.
 
 ```bash
-uv run --project scripts/evaluate-setup evaluate-setup scan skills/ --target python-conventions
+uv run --project scripts/evaluate-setup evaluate-setup scan . --target python-conventions
 ```
 
-This scans all skills under `skills/` but filters the output to show diagnostics only for `python-conventions`, while still using all other skills' data for duplicate detection and overlap analysis.
-
-**Example output:**
-
-```
-## Single-Skill Review: python-conventions
-
-### python-conventions                         ★★★★    KEEP
-  Tokens: 1,027
-
-  Rubric:
-    Specificity:      5/5  Complete code examples for dotenv, LLM JSON parsing
-    Redundancy:       4/5  "Test behavior not internals" overlaps Claude's defaults
-    Trigger quality:  3/5  Description doesn't start with "Use when"
-    Token efficiency: 4/5  1,027 tokens — some overlap with data-pipeline-patterns
-    Content quality:  5/5  Code examples for every pattern, anti-pattern table
-
-  Context analysis:
-    vs data-pipeline-patterns:  Minor overlap on API client rules (not a merge candidate — different scopes)
-    vs security-check:          No overlap
-    vs CLAUDE.md:               No duplication or conflicts detected
-    Trigger overlap:            None — descriptions target different task types
-```
+Note: For a deep single-skill evaluation with A/B testing, use `/evaluate-skill` instead — it runs all 3 layers on one skill.
 
 #### 5.3.3 CLAUDE.md evaluation
 
-When the user runs `/evaluate-setup --claude-md` or `/evaluate-setup --all`, the tool evaluates CLAUDE.md files against [Claude Code best practices](https://code.claude.com/docs/en/best-practices).
+The tool always evaluates CLAUDE.md files as part of the full setup scan, against [Claude Code best practices](https://code.claude.com/docs/en/best-practices).
 
 CLAUDE.md is loaded every session, so it has a different evaluation model than skills (which load on demand). The key question isn't "is this specific enough?" but "does every line earn its place in every conversation?"
 
@@ -995,7 +1042,7 @@ CLAUDE.md is loaded every session, so it has a different evaluation model than s
 
 #### 5.3.4 Command evaluation
 
-When the user runs `/evaluate-setup --commands` or `/evaluate-setup --all`, the tool evaluates command.md files.
+The tool always evaluates command.md files as part of the full setup scan.
 
 Commands are user-triggered workflows (invoked via `/command-name`). They have different quality criteria than skills — a command needs clear instructions for Claude to follow, a valid description for the UI menu, and working script references.
 
@@ -1077,8 +1124,9 @@ Python module within the evaluator package (`scripts/evaluate-setup/src/the_eval
 
 **Subcommands:**
 - `screen-skills <skills-dir>` — Gemini screens which skills are A/B testable
-- `generate-tasks <skill-path>` — Gemini generates 3 repo-based test tasks for a skill
-- `judge <task> <file-a> <file-b>` — Gemini judges which response is better (3 votes)
+- `generate-tasks <skill-path> [--red-team] [--repos-file <path>]` — Gemini generates 3 repo-based test tasks for a skill
+- `validate-tasks <tasks-file>` — Validates task premises against actual repositories using Gemini-generated shell commands
+- `judge <task> <file-a> <file-b> [--red-team] [--comparison-type absolute|marginal]` — Gemini judges which response is better (3 votes, blind dimension scoring)
 
 **The flow for one skill (standard mode):**
 
@@ -1112,11 +1160,9 @@ Step 3.5: Quality screening
 Step 4: Judging with repeat-and-vote (3 Gemini calls per skill, fewer if tasks skipped)
   For each valid allexcept/withskill pair:
     Send both responses to Gemini in randomized order (blinded).
-    Include the skill content as context for convention-aware judging.
-    Two-step evaluation:
-      Step A — Redundancy check (~70%): did one response apply specific
-        conventions from the skill that the other missed?
-      Step B — Quality check (~30%): tiebreaker if Step A is inconclusive.
+    Judge scores each response on 5 dimensions (1-5): accuracy, specificity,
+      actionability, completeness, response_posture.
+    Winner by total score difference: >=3 clear, 1-2 marginal, 0 tie.
     Repeat 3 times (repeat-and-vote). Majority verdict wins.
   That's up to 3 pairs x 3 votes = 9 judge calls (fewer if tasks skipped).
 
@@ -1138,18 +1184,23 @@ Step 5: Aggregation (good-quality tasks only)
 
 ```json
 {
+  "comparison_type": "marginal",
   "votes": [
     {
-      "reasoning": "Response 2 used the 'data' key and included 'source_file' metadata as the skill requires.",
+      "reasoning": "Response 2 provides more specific file references and actionable suggestions.",
       "verdict": "with_skill",
+      "scores": {
+        "with_skill": {"accuracy": 4, "specificity": 5, "actionability": 4, "completeness": 4, "response_posture": 4},
+        "without_skill": {"accuracy": 4, "specificity": 3, "actionability": 3, "completeness": 3, "response_posture": 3}
+      },
       "test_quality": "good",
-      "test_quality_reason": "The task tested specific naming conventions from the skill.",
-      "redundancy_signal": "unique"
+      "test_quality_reason": "Both responses substantively engaged with the task."
     }
   ],
   "pair_verdict": "with_skill",
   "confidence": "HIGH",
-  "test_quality": "good"
+  "test_quality": "good",
+  "dimension_deltas": {"accuracy": 0.0, "specificity": 1.3, "actionability": 0.7, "completeness": 0.7, "response_posture": 0.3}
 }
 ```
 
@@ -1159,15 +1210,18 @@ Step 5: Aggregation (good-quality tasks only)
 |---|---|---|
 | Skill screening | `.tmp/deep-eval/skill-screening.json` | JSON |
 | Task definitions | `.tmp/deep-eval/<skill>_tasks.json` | JSON |
-| Agent responses | `.tmp/deep-eval/<skill>_task<N>_with.txt` / `_without.txt` | Plain text |
+| Task validation | `.tmp/deep-eval/<skill>_validation.json` | JSON |
+| Agent responses | `.tmp/deep-eval/<skill>_task<N>_allexcept.txt` / `_withskill.txt` | Plain text |
+| Allexcept prompts | `.tmp/deep-eval/all_except_<skill>.txt` | Plain text |
 | Repo snapshots | `.tmp/deep-eval/repo_snapshot_<repo>.txt` | Line count |
 | Repo metadata | `.tmp/deep-eval/repos.json` | JSON |
-| Deep evaluation log | `evaluate-setup-deep-log.md` | Markdown |
+| Deep evaluation log | `evaluate-skill-<skill-name>-log.md` | Markdown |
 
 **Judge robustness:**
-- **Redundancy-first judging** — the primary criterion (~70%) is whether the skill's conventions made a measurable difference, not general quality. This catches skills that are redundant because Claude already follows the same patterns.
-- **Skill context in judge prompt** — the skill content is provided to the judge (`--skill-file` flag) so it can check for specific convention adherence, not just overall quality.
-- **Reasoning before verdict** — the judge must explain its thinking before picking a winner.
+- **Blind dimension scoring** — the judge scores each response independently on 5 dimensions (accuracy, specificity, actionability, completeness, response_posture), then determines the winner by total score difference. The judge does NOT see the skill content — it evaluates purely on output quality.
+- **Computed winner** — the winner is determined programmatically from scores, not from the judge's self-reported "winner" field. Score difference >=3 = clear winner, 1-2 = marginal winner, 0 = tie.
+- **Dimension deltas** — per-dimension deltas (with_skill score - without_skill score) are averaged across good-quality votes and reported in the output. This shows exactly which quality dimensions the skill affects.
+- **Reasoning before verdict** — the judge must explain its thinking before scoring.
 - **Defensive JSON parsing** — the parser tries direct JSON, then code block extraction, then first `{...}` match, then first `[...]` match. Never crashes, never drops a result.
 
 #### 5.4.1 Red-team mode
@@ -1217,7 +1271,7 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 - **3-0 unanimous** → HIGH confidence. All 3 judges agreed.
 - **2-1 split** → LOW confidence. The majority wins, but the dissenting reasoning is preserved in the output so the user can see why one judge disagreed.
 
-**Cost impact:** Up to 9 Gemini judge calls per skill (3 pairs × 3 votes), fewer if tasks are skipped for poor quality. No separate Claude API costs — subagents run in the current session.
+**Cost impact:** Up to 9 Gemini judge calls per skill (3 tasks × 3 votes), fewer if tasks are skipped for poor quality. No separate Claude API costs — subagents run in the current session.
 
 
 **Why 3 votes, not 5:** Diminishing returns. 3 votes catches the common case (one judge was wrong) with minimal cost. 5 votes only helps when the judge is essentially flipping a coin, which means the skill difference is genuinely ambiguous — and that's a valid signal to surface as LOW confidence rather than mask with more votes.
@@ -1232,7 +1286,7 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 **`/evaluate-setup`** orchestrates L1+L2 on the whole setup:
 
 0. **Step 0:** Ask output format (terminal/file).
-1. Run Layer 1 (rule engine) on all skills, commands, CLAUDE.md, hooks. Read the JSON.
+1. Run Layer 1 (rule engine) on all skills, commands, CLAUDE.md, hooks, agents. Read the JSON.
 2. Read all files and evaluate against rubrics (Layer 2). Score each item. Run cross-type optimization.
 3. Produce the full review (to terminal or file).
 4. **Always** print a short terminal summary with numbered suggestions.
@@ -1251,19 +1305,13 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 
 ## 6. Scope
 
-### 6.1 What v1.3 includes
+### 6.1 What v2.0 includes
 
-- Evaluating Claude Code **skills**, **commands**, **CLAUDE.md**, and **hooks**
-- **Scope modes:**
-  - Full setup scan (`--all`): evaluate all skills + CLAUDE.md + commands + hooks
-  - Skills only: evaluate all skills in a directory
-  - Single-skill mode (`--target`): evaluate one skill in context of the full setup
-  - CLAUDE.md only (`--claude-md`): evaluate CLAUDE.md against best practices
-  - Commands only (`--commands`): evaluate all command.md files
-  - Hooks only (`--hooks`): evaluate hooks in settings.json
+- Evaluating Claude Code **skills**, **commands**, **CLAUDE.md**, **hooks**, and **agents**
+- **Scan always evaluates everything.** The `scan` command finds all file types automatically. Use `--target` to focus output on a single skill while still scanning everything for context.
 - **Two commands:** `/evaluate-setup` (whole setup, L1+L2) and `/evaluate-skill` (single skill, L1+L2+L3)
 - **Interactive Step 0:** `/evaluate-setup` asks output format only. `/evaluate-skill` asks which skill + output format.
-- **Layer 1:** pluggable rule engine with 15 rules across 4 file types (skills, commands, CLAUDE.md, hooks)
+- **Layer 1:** pluggable rule engine with 21 rules across 5 file types (skills, commands, CLAUDE.md, hooks, agents)
 - **Layer 1 extras:** config presets (recommended/strict/security), `.evaluator.yaml` per-rule overrides, inline suppression comments
 - **Layer 2 skills rubric:** 5 dimensions (specificity, redundancy, trigger quality with autonomy impact, token efficiency, content quality)
 - **Layer 2 autonomy analysis:** coercive trigger language detection ("MUST", "ALWAYS"), hard gate detection, broad category intercept detection
@@ -1275,16 +1323,17 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 - **Layer 2 behavioral pattern checks:** mandate stacking, autonomy erosion, broad trigger collision
 - **Layer 2 setup-wide recommendations:** merge candidates, overlapping triggers, coverage gaps, total context budget
 - **Numbered suggestions:** final summary with numbered items so users can say "do 1, skip 2"
-- **Layer 3 standard (optional):** A/B evaluation via subagents + Gemini judging with redundancy-first approach (3 votes per pair)
+- **Layer 3 standard (optional):** A/B evaluation via subagents + Gemini blind dimension scoring (3 votes per pair)
 - **Layer 3 auto red-team:** adversarial testing automatically activates for preventive skills
 - **Layer 3 skill screening:** Gemini pre-screens skills for A/B testability before user selects
 - **Layer 3 artifacts:** all intermediate data saved to `.tmp/deep-eval/` (screening, tasks, responses, snapshots)
-- **Command prompt structure:** thin command.md (26KB) + reference files (`layer3-protocol.md`, `report-format.md`) loaded on demand
+- **Layer 3 task validation:** `validate-tasks` subcommand verifies task premises against actual repos using Gemini-generated shell commands
+- **Command prompt structure:** thin command.md + reference files (`layer3-protocol.md`, `report-format.md`) loaded on demand
 - **Structural tests:** `tests/test_command_prompts.py` validates command.md and SKILL.md files (size, frontmatter, coercive language, orphan references)
 - Read-only — never modifies files or repositories
 - Cost controls — estimates before API calls, user confirms
 
-### 6.2 What v1.3 does NOT include
+### 6.2 What v2.0 does NOT include
 
 - Evaluating MCP servers (hooks are covered, MCP is a future feature)
 - Executable-test scoring (actually running generated code to check correctness)
@@ -1299,7 +1348,7 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 
 1. **Layer 3 doesn't test skill activation.** It tests whether the skill's content helps when loaded. It does not test whether Claude Code correctly decides to load the skill. Layer 2 compensates by evaluating trigger quality.
 
-2. **Generated tasks are biased toward the skill.** Because Gemini generates tasks from the skill's own description, the tasks test what the skill claims to do. The redundancy-first judging approach partially compensates — if Claude already follows the skill's conventions without it loaded, that's a strong signal the skill is redundant regardless of task bias.
+2. **Generated tasks are biased toward the skill.** Because Gemini generates tasks from the skill's own description, the tasks test what the skill claims to do. The blind dimension scoring partially compensates — if both agents score similarly on specificity and actionability, that's a strong signal the skill is redundant regardless of task bias.
 
 3. **LLM-as-judge isn't perfect.** Gemini has known biases (prefers longer responses, prefers better formatting, position effects). We mitigate with blinding, randomized order, repeat-and-vote (3 judge calls per pair with majority verdict), skill-aware context in the judge prompt, and requiring reasoning before verdict. LOW confidence pairs (2-1 splits) are flagged in the output.
 
@@ -1323,13 +1372,13 @@ For each with/without pair, the judge is called 3 times (same prompt, same respo
 
 Status of questions from original design:
 
-1. ~~**What is Claude's baseline behavior list?**~~ **Resolved.** The Layer 2 rubric includes a reference list of things Claude does by default (section 5.3). Layer 3's redundancy-first judging empirically validates this — if both agents (with and without skill) follow the same patterns, the skill is confirmed redundant.
+1. ~~**What is Claude's baseline behavior list?**~~ **Resolved.** The Layer 2 rubric includes a reference list of things Claude does by default (section 5.3). Layer 3's blind dimension scoring empirically validates this — if both agents score similarly, the skill is confirmed redundant.
 
 2. ~~**Which Claude model for Layer 3?**~~ **Resolved differently.** Layer 3 uses Claude Code subagents (inheriting the current session's model) instead of the Claude API. No model selection needed.
 
 3. ~~**How to evaluate preventive skills?**~~ **Resolved in v1.1** — red-team mode with adversarial task generation and HELD/BROKE/PARTIAL verdicts.
 
-4. ~~**Should `/evaluate-setup` save a report file?**~~ **Resolved.** Step 0 asks the user to choose terminal or file output. Reports save to `evaluate-setup-report.md`, deep logs to `evaluate-setup-deep-log.md`.
+4. ~~**Should `/evaluate-setup` save a report file?**~~ **Resolved.** Step 0 asks the user to choose terminal or file output. Reports save to `evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md`, deep logs to `evaluate-skill-<skill-name>-log.md`.
 
 5. **Duplicate similarity threshold.** 0.85 cosine similarity is the current default. Needs calibration on more real skill sets.
 
@@ -1337,7 +1386,7 @@ Status of questions from original design:
 
 7. **Red-team adversarial task quality.** Partially addressed — Gemini generates tasks with repo context which makes them more realistic. Still needs evaluation on more preventive skills.
 
-8. ~~**Rule engine extensibility for commands and CLAUDE.md.**~~ **Resolved.** Same engine with different parsers — 15 rules across 4 file types (skills, commands, CLAUDE.md, hooks).
+8. ~~**Rule engine extensibility for commands and CLAUDE.md.**~~ **Resolved.** Same engine with different parsers — 21 rules across 5 file types (skills, commands, CLAUDE.md, hooks, agents).
 
 ---
 

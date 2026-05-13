@@ -101,7 +101,7 @@ Two commands for two different jobs:
 
 Evaluates all skills, commands, CLAUDE.md, and hooks together. Always evaluates everything — no scope selection needed.
 
-**Layer 1 — Static Analysis.** A rule engine with 15 rules scans for mechanical issues: missing descriptions, broken references, duplicate content, prompt injection patterns, token budget violations.
+**Layer 1 — Static Analysis.** A rule engine with 21 rules across 5 file types (skills, commands, CLAUDE.md, hooks, agents) scans for mechanical issues: missing descriptions, broken references, duplicate content, prompt injection patterns, token budget violations, credential access.
 
 **Layer 2 — AI Review.** Claude scores each item on a structured rubric (5 dimensions, 1-5 scale) and suggests cross-type optimizations — e.g., "this skill should be a hook" or "move this from CLAUDE.md to a skill."
 
@@ -143,6 +143,8 @@ The `main` branch is Claude Code only. For Claude Code + Cursor support, see the
 
 - [`GUIDE.md`](GUIDE.md) — Full reference for all skills, commands, and hooks
 - [`docs/spec.md`](docs/spec.md) — Full evaluator specification
+- [`docs/HOW-EVALUATE-SETUP-WORKS.md`](docs/HOW-EVALUATE-SETUP-WORKS.md) — How /evaluate-setup works (plain language)
+- [`docs/HOW-EVALUATE-SKILL-WORKS.md`](docs/HOW-EVALUATE-SKILL-WORKS.md) — How /evaluate-skill works (plain language)
 
 ## Credits
 
