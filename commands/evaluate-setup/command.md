@@ -24,7 +24,7 @@ Ask using AskUserQuestion:
   - **Terminal** — print everything here
   - **File** — save to a file (recommended for full scans)
 
-**If the user chose file output:** Save to `evaluation-results/evaluate-setup-YYYY-MM-DD.md`. Create the `evaluation-results/` directory if it doesn't exist. If the date-based filename already exists (second run same day), append a counter: `evaluate-setup-YYYY-MM-DD-2.md`, `-3`, etc.
+**If the user chose file output:** Save to `evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md` (e.g. `evaluate-setup-2026-05-13-1430.md`). Create the `evaluation-results/` directory if it doesn't exist.
 
 ## Arguments
 
@@ -292,6 +292,7 @@ This is where you look at the **whole setup** and suggest transformations betwee
 - **Total context budget**: Sum all skills + CLAUDE.md + commands tokens, warn if >20% of context window
 - **Redundancy across types**: Same instruction appearing in CLAUDE.md AND a skill (double token cost)
 - **Conflicts across types**: CLAUDE.md says one thing, a skill says the opposite
+- **Command shadows built-in**: Does any command share a name with a Claude Code built-in slash command (init, review, security-review, help, clear, compact, config, cost, doctor, login, logout, memory, model, permissions, status, vim)? If so, flag it — the custom command overrides the built-in, which may be intentional or accidental
 
 ### Behavioral pattern checks (setup-wide):
 
@@ -303,7 +304,7 @@ These checks look at patterns across the whole setup, not individual items:
 
 ### Output format
 
-Answer **every one** of the 20 checks explicitly with YES or NO and a one-line explanation. Do not skip any check. Use the numbered format defined in `report-format.md` — transformations (1-11), setup-wide (12-17), behavioral patterns (18-20).
+Answer **every one** of the 21 checks explicitly with YES or NO and a one-line explanation. Do not skip any check. Use the numbered format defined in `report-format.md` — transformations (1-11), setup-wide (12-18), behavioral patterns (19-21).
 
 ## Step 5: Produce the Report
 

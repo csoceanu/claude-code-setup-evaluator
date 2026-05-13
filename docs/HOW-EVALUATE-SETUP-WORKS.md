@@ -8,7 +8,7 @@ This document explains what happens when you run `/evaluate-setup` — the healt
 
 Claude asks: **"Terminal or file?"** That's the only question. Then it starts.
 
-If you choose file, the report is saved to `evaluation-results/evaluate-setup-YYYY-MM-DD.md`.
+If you choose file, the report is saved to `evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md`.
 
 ---
 
@@ -20,45 +20,47 @@ Claude runs one command:
 uv run --project "$PROJECT_DIR" evaluate-setup scan .
 ```
 
-Behind that one command, a Python project with ~50 files does this:
+Behind that one command, a Python project does this:
 
 ### Discovery
 
 It walks the directory tree and finds everything in your setup:
 
 - `SKILL.md` files → skills
-- `commands/*/command.md` files → commands
-- `CLAUDE.md` / `CLAUDE.local.md` → CLAUDE.md files
-- `.claude/settings.json` → hooks
-- `agents/*.md` files → agents
+- `commands/*/command.md` files → commands (skips the evaluator's own commands)
+- `CLAUDE.md` / `CLAUDE.local.md` → CLAUDE.md files (also checks parent directory)
+- `.claude/settings.json` / `.claude/settings.local.json` → hooks
+- `agents/*.md` files → agents (also detects agents by frontmatter if no `agents/` directory exists)
 
 It skips anything inside a nested git repo (cloned projects, submodules) — those aren't part of your setup.
 
 ### Rules
 
-Each item gets checked by a set of Python rules. Every rule checks one specific thing mechanically — no AI involved, fully deterministic, same input always produces same output.
+Each item gets checked by a set of Python rules — 21 rules across 5 file types. Every rule checks one specific thing mechanically — no AI involved, fully deterministic, same input always produces same output.
 
 **Skills get 9 rules:**
 
 | Rule | What it checks |
 |------|---------------|
 | SKILL.md exists | The skill directory contains a SKILL.md file |
-| Frontmatter valid | YAML frontmatter parses correctly, name matches directory |
 | Description required | Description field exists and is not empty |
-| Description quality | Description uses third-person, includes "use when" context, reasonable length |
+| Description quality | Third-person POV, includes use-case context ("use when", "applies to"), length between 20 and 1,024 characters |
+| Frontmatter valid | YAML frontmatter parses correctly, name matches directory |
 | Token budget | SKILL.md is under the token limit and under 500 lines |
 | Broken references | All file links and references point to files that exist |
 | Duplicate detection | No other skill is >85% similar (TF-IDF cosine similarity) |
-| No prompt injection | No patterns that could hijack Claude's behavior (17 regex patterns) |
-| No credential access | No references to ~/.ssh, ~/.aws, $API_KEY, sudo, chmod 777 |
+| No prompt injection | No patterns that could hijack Claude's behavior (context-aware: downgrades in code blocks) |
+| No credential access | No references to ~/.ssh, ~/.aws, $API_KEY, sudo, chmod 777, dangerous commands |
 
-**Commands get 4 rules:**
+**Commands get 6 rules:**
 
 | Rule | What it checks |
 |------|---------------|
-| Description required | Description field exists for the UI menu |
+| Description required | Description field exists for the UI menu, not too vague |
 | Script exists | Referenced script files actually exist |
-| No prompt injection | Same 17-pattern check as skills |
+| Skill overlap | No command is >60% similar to a skill body (cross-type duplication) |
+| Duplicate detection | No other command is >85% similar (TF-IDF cosine similarity) |
+| No prompt injection | Same pattern check as skills |
 | No credential access | Same credential/dangerous command check as skills |
 
 **CLAUDE.md gets 2 rules:**
@@ -66,13 +68,13 @@ Each item gets checked by a set of Python rules. Every rule checks one specific 
 | Rule | What it checks |
 |------|---------------|
 | File exists | CLAUDE.md is present in the project |
-| Skill duplication | No section is >60% similar to a skill body (wasted tokens) |
+| Skill duplication | No section has high word overlap with a skill body (wasted tokens) |
 
 **Hooks get 1 rule:**
 
 | Rule | What it checks |
 |------|---------------|
-| Valid structure | Commands exist, no dangerous patterns (rm -rf, git push --force, curl\|bash) |
+| Valid structure | Commands exist, no dangerous patterns (rm -rf, git push --force, curl\|bash), scripts exist |
 
 **Agents get 6 rules:**
 
@@ -82,8 +84,8 @@ Each item gets checked by a set of Python rules. Every rule checks one specific 
 | Referenced skills exist | Every skill listed in frontmatter has a matching SKILL.md |
 | DisallowedTools format | Entries match ToolName or ToolName(pattern) format |
 | Constraint-body match | Body constraints ("cannot push") are backed by disallowedTools |
-| No prompt injection | Same 17-pattern check |
-| No credential access | Same credential check |
+| No prompt injection | Same pattern check as skills |
+| No credential access | Same credential check as skills |
 
 ### Output
 
@@ -99,7 +101,8 @@ Claude takes the JSON from Layer 1, then reads the actual files:
 - Every reference file in `skills/` subdirectories (the detailed content behind progressive disclosure)
 - Every `guidelines.md` (behavioral rules)
 - Every command.md
-- Every hook script
+- Every agent .md file
+- Every hook entry in settings.json
 - The CLAUDE.md
 
 Layer 1 catches mechanical issues. Claude needs the actual content to judge quality.
@@ -142,7 +145,7 @@ Specificity, constraint clarity, zero-trust integrity, token efficiency, content
 
 ## Step 4: Cross-type analysis — the full picture
 
-Claude looks at the whole setup together and runs 20 checks:
+Claude looks at the whole setup together and runs 21 checks:
 
 ### Transformations (11 checks)
 
@@ -160,7 +163,7 @@ Claude looks at the whole setup together and runs 20 checks:
 | 10 | Skill structure optimization | Should any large skill split into thin SKILL.md + reference files? |
 | 11 | Guidelines extraction | Should any skill extract hard limits to a separate guidelines.md? |
 
-### Setup-wide (6 checks)
+### Setup-wide (7 checks)
 
 | # | Check | Question |
 |---|-------|----------|
@@ -170,14 +173,15 @@ Claude looks at the whole setup together and runs 20 checks:
 | 15 | Total context budget | Do all skills + CLAUDE.md + commands exceed 20% of context window? |
 | 16 | Redundancy across types | Does the same instruction appear in both CLAUDE.md and a skill? |
 | 17 | Conflicts across types | Does CLAUDE.md say one thing while a skill says the opposite? |
+| 18 | Command shadows built-in | Does any command share a name with a Claude Code built-in slash command? |
 
 ### Behavioral patterns (3 checks)
 
 | # | Check | Question |
 |---|-------|----------|
-| 18 | Mandate stacking | Do >2 skills use coercive language (MUST/ALWAYS/NEVER) creating competing demands? |
-| 19 | Autonomy erosion | Do any broad-trigger skills contain hard gates that block the user's workflow? |
-| 20 | Broad trigger collision | Do multiple skills individually cast too wide a net? |
+| 19 | Mandate stacking | Do >2 skills use coercive language (MUST/ALWAYS/NEVER) creating competing demands? |
+| 20 | Autonomy erosion | Do any broad-trigger skills contain hard gates that block the user's workflow? |
+| 21 | Broad trigger collision | Do multiple skills individually cast too wide a net? |
 
 Each check gets an explicit **YES** or **NO** answer with a one-line explanation.
 
@@ -187,7 +191,7 @@ Each check gets an explicit **YES** or **NO** answer with a one-line explanation
 
 Claude writes the final report:
 
-- **If file**: saves to `evaluation-results/evaluate-setup-YYYY-MM-DD.md`
+- **If file**: saves to `evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md`
 - **If terminal**: prints the full report directly
 
 Either way, Claude always prints a **short summary at the end** in the terminal — the bottom line, total counts, and numbered suggestions the user can act on by saying "do 1", "do 2", etc.

@@ -2,7 +2,7 @@
 
 ### Step 5a: Full Review
 
-If the user chose **terminal output**, print the full review directly. If they chose **file output**, write it to `evaluation-results/evaluate-setup-YYYY-MM-DD.md` (create the directory if needed; if the file exists, append a counter: `-2`, `-3`, etc.) and tell the user where to find it.
+If the user chose **terminal output**, print the full review directly. If they chose **file output**, write it to `evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md` (create the directory if needed; if the file exists, append a counter: `-2`, `-3`, etc.) and tell the user where to find it.
 
 Full review format:
 
@@ -46,9 +46,11 @@ or failed. Here is what each rule checks:
 - **No prompt injection** — no patterns that could hijack Claude's behavior (17 regex patterns)
 - **No credential access** — no references to ~/.ssh, ~/.aws, $API_KEY, sudo, chmod 777
 
-### Commands (4 rules)
+### Commands (6 rules)
 - **Description required** — description field exists for the UI menu
 - **Script exists** — referenced script files actually exist
+- **Skill overlap** — no command is >60% similar to a skill body (cross-type duplication)
+- **Duplicate detection** — no other command is >85% similar (TF-IDF cosine similarity)
 - **No prompt injection** — same 17-pattern check as skills
 - **No credential access** — same credential/dangerous command check as skills
 
@@ -70,7 +72,14 @@ or failed. Here is what each rule checks:
 ---
 
 ## Inventory
-  [table: type, count, tokens, reference files]
+
+| Type | Count | Total Tokens | Errors | Warnings |
+|------|-------|-------------|--------|----------|
+| Skills | [N] | [N] | [N] | [N] |
+| Commands | [N] | [N] | [N] | [N] |
+| CLAUDE.md | [N] | [N] | [N] | [N] |
+| Hooks | [N] | [N] | [N] | [N] |
+| Agents | [N or 0] | [N] | [N] | [N] |
 
 ## Skills
 
@@ -89,14 +98,19 @@ or failed. Here is what each rule checks:
     [Example with issues:]
     ✓ SKILL.md exists     ✓ Frontmatter valid      ✓ Description required
     ⚠ Description quality — lacks "Use when" context
-    ✓ Token budget (1,485) ✗ Prompt injection — "jailbreak attempt" at line 49 (false positive: WCAG term)
+    ✓ Token budget (1,485)
+    ✗ Prompt injection — line 49 contains a word the scanner flagged, but it's normal accessibility terminology — not a real risk
     ✓ No broken references ✓ No duplicates          ✓ No credential access
+
+    [When a Layer 1 rule flags something, explain it in plain language.
+    Don't use jargon like "WCAG SC 3.3.7" or "false positive" — just say
+    what the scanner found and whether it's a real problem or not.]
 
   Rubric:
     **Readiness:**    [PASS/FAIL] — [one sentence from Layer 1 results]
     **Correctness:**  [PASS/FAIL] — [one sentence]
     **Redundancy:**   [score/5] — [one sentence: what's unique vs what Claude already knows]
-    **Compliance:**
+    **Compliance:**   [overall score — weighted average of the 4 sub-scores below]
       Specificity: [score/5]  [one sentence justification]
       Trigger:     [score/5]  [one sentence justification]
       Token eff:   [score/5]  [one sentence justification]
@@ -170,7 +184,7 @@ For each hook entry:
 
 ## Cross-Type Optimization
 
-Answer each of the 20 checks explicitly. Do not skip any.
+Answer each of the 21 checks explicitly. Do not skip any.
 
 ### Transformations
   1. Skill → Hook:               [YES/NO] — [one-line explanation]
@@ -192,11 +206,12 @@ Answer each of the 20 checks explicitly. Do not skip any.
   15. Total context budget:       [tokens] ([pct]% of context) — [OK/WARNING]
   16. Redundancy across types:    [YES/NO] — [what's duplicated or "none"]
   17. Conflicts across types:     [YES/NO] — [what conflicts or "none"]
+  18. Command shadows built-in:   [YES/NO] — [which commands shadow built-ins or "none"]
 
 ### Behavioral Patterns
-  18. Mandate stacking:           [YES/NO] — [how many mandates, acceptable?]
-  19. Autonomy erosion:           [YES/NO] — [which skills or "none"]
-  20. Broad trigger collision:    [YES/NO] — [which skills or "none"]
+  19. Mandate stacking:           [YES/NO] — [how many mandates, acceptable?]
+  20. Autonomy erosion:           [YES/NO] — [which skills or "none"]
+  21. Broad trigger collision:    [YES/NO] — [which skills or "none"]
 
 ## Suggestions
   [Numbered actionable items]
@@ -219,7 +234,7 @@ Suggestions (say "do 1", "do 2", "skip 3" to act on them):
   2. <one-line suggestion>
   3. <one-line suggestion>
 
-Full review: <"printed above" or "saved to evaluation-results/evaluate-setup-YYYY-MM-DD.md">
+Full review: <"printed above" or "saved to evaluation-results/evaluate-setup-YYYY-MM-DD-HHMM.md">
 ```
 
 **Numbering rules:**
