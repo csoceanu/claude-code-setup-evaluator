@@ -13,7 +13,7 @@ description: >-
 # Update Docs
 
 Code changes can silently invalidate documentation. A renamed function,
-a changed API signature, a removed configuration option — each can leave
+a changed API signature, a removed configuration option, each can leave
 docs describing behavior that no longer exists. This skill detects that
 drift by matching the code diff against in-repo documentation and
 updating docs whose descriptions contradict the new code.
@@ -164,16 +164,11 @@ For each doc confirmed stale:
 2. Update the documentation so it accurately reflects the new code
 3. Preserve the file's existing format, style, and structure
 
-### 8. Commit changes
+### 8. Present changes for review
 
-If any documentation files were updated:
-
-```bash
-git add <updated_doc_files>
-git commit -m "[TICKET_KEY] docs: update documentation for code changes"
-```
-
-Replace TICKET_KEY with the actual ticket key from the task context.
+Do **not** commit automatically. Instead, present the user with a
+summary of every file you updated and what changed in each one.
+Let the user review the changes and decide whether to commit.
 
 ### 9. Output
 
