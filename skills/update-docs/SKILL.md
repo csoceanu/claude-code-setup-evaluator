@@ -1,7 +1,7 @@
 ---
 name: update-docs
 version: "1.0"
-description: Detects documentation files that have become stale due to code changes and applies targeted updates. Builds an identifier checklist from the diff, greps documentation for matches, evaluates candidates in two passes, reviews beyond grep results, and edits confirmed stale docs in-place.
+description: Detects documentation files that have become stale due to code changes and applies targeted updates. Use when implementing features, fixing bugs, or refactoring code that may invalidate existing docs. Relevant for any repository with in-repo documentation.
 ---
 
 # Update Docs
